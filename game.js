@@ -1689,6 +1689,10 @@ function startFinale() {
   G.finaleT = 0;
   G.objs.length = 0;
   G.prince.locked = 99;
+  G.prince.vx = 0;
+  /* step away from the rose: this is her moment, not his */
+  G.finaleFrom = G.prince.x;
+  G.finaleTo = G.roseX + (G.prince.x <= G.roseX ? -82 * S : 82 * S);
   save.finale = true;
   save.endless = true;
   if (G.score > save.high) save.high = G.score;
@@ -1873,6 +1877,12 @@ var finaleLines = [];
 function updateFinale(dt) {
   G.finaleT += dt;
   var t = G.finaleT;
+  if (G.finaleTo !== undefined) {
+    var k = Math.min(1, t / 1.8);
+    G.prince.x = G.finaleFrom + (G.finaleTo - G.finaleFrom) * (k * k * (3 - 2 * k));
+    G.prince.walk += dt * (k < 1 ? 2.4 : 0.4);
+    moveScarf(G.prince, dt);
+  }
   G.bloom = Math.min(1, 0.12 + t / 6);
   if (t > 6) G.red = Math.min(1, (t - 6) / 3.5);
   if (t > 3 && t < 3.1) sfx.spark();
@@ -1888,8 +1898,16 @@ function updateFinale(dt) {
 
 /* ============================ render ===================================== */
 function lerpCol(a, b, t) {
-  function hex(c) { return [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)]; }
-  var A = hex(a), B = hex(b);
+  /* accepts '#rrggbb' and the 'rgb(r,g,b)' this function itself returns, so
+     tints can be layered on tints */
+  function rgb(c) {
+    if (c.charAt(0) === '#') {
+      return [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)];
+    }
+    var m = c.match(/-?\d+(\.\d+)?/g);
+    return m ? [+m[0] | 0, +m[1] | 0, +m[2] | 0] : [0, 0, 0];
+  }
+  var A = rgb(a), B = rgb(b);
   return 'rgb(' + Math.round(A[0] + (B[0] - A[0]) * t) + ',' + Math.round(A[1] + (B[1] - A[1]) * t) + ',' +
          Math.round(A[2] + (B[2] - A[2]) * t) + ')';
 }
@@ -1901,9 +1919,41 @@ function buildSky(top, bot) {
   var g = c.getContext('2d');
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   var lg = g.createLinearGradient(0, 0, 0, H);
-  lg.addColorStop(0, top); lg.addColorStop(1, bot);
+  lg.addColorStop(0, top); lg.addColorStop(0.62, lerpCol(top, bot, 0.72)); lg.addColorStop(1, bot);
   g.fillStyle = lg; g.fillRect(0, 0, W, H);
+
+  /* a band of far-off dust across the sky, three washes crossed */
+  g.save();
+  g.translate(W * 0.52, H * 0.34); g.rotate(-0.42);
+  var neb = [['rgba(120,170,190,0.17)', 1], ['rgba(170,140,200,0.13)', 0.62], ['rgba(230,190,150,0.1)', 0.34]];
+  for (var n = 0; n < neb.length; n++) {
+    var rg = g.createRadialGradient(0, 0, 0, 0, 0, W * 0.62 * neb[n][1]);
+    rg.addColorStop(0, neb[n][0]); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = rg;
+    g.save(); g.scale(1, 0.26 + n * 0.08);
+    g.beginPath(); g.arc(0, 0, W * 0.62 * neb[n][1], 0, 6.2832); g.fill();
+    g.restore();
+  }
+  g.restore();
+
+  /* denser stars inside the band */
+  for (var i = 0; i < 90; i++) {
+    var t2 = (hash(i, 61) - 0.5) * W * 1.25;
+    var u2 = (hash(i, 62) - 0.5) * H * 0.3;
+    var px = W * 0.52 + t2 * Math.cos(-0.42) - u2 * Math.sin(-0.42);
+    var py = H * 0.34 + t2 * Math.sin(-0.42) + u2 * Math.cos(-0.42);
+    g.globalAlpha = 0.2 + hash(i, 63) * 0.5;
+    g.fillStyle = hash(i, 64) < 0.2 ? GOLD : CREAM;
+    g.beginPath(); g.arc(px, py, (0.5 + hash(i, 65) * 1.1) * S, 0, 6.2832); g.fill();
+  }
+  g.globalAlpha = 1;
   if (starfield) { g.globalAlpha = 0.85; g.drawImage(starfield, 0, 0, W, H); g.globalAlpha = 1; }
+
+  /* the planet's own air, glowing where it meets the sky */
+  var hg = g.createLinearGradient(0, gr.base - H * 0.3, 0, gr.base + 10 * S);
+  hg.addColorStop(0, 'rgba(0,0,0,0)');
+  hg.addColorStop(1, 'rgba(150,210,195,0.2)');
+  g.fillStyle = hg; g.fillRect(0, gr.base - H * 0.3, W, H * 0.3 + 10 * S);
   skyTex = c;
 }
 function drawSky() {
@@ -1952,12 +2002,35 @@ function drawSky() {
     ctx.globalAlpha = 1;
   }
 
-  /* a couple of little worlds, far off */
+  /* little worlds, each drifting at its own distance */
   var t = G.t;
-  inkBlob(W * 0.17, H * 0.30 + Math.sin(t * 0.3) * 3 * S, 20 * S, 400, 'rgba(158,200,176,0.3)', 1, 1, 1.3);
-  inkBlob(W * 0.78, H * 0.22 + Math.cos(t * 0.24) * 3 * S, 12 * S, 401, 'rgba(224,184,120,0.3)', 1, 1, 1.3);
-  inkPath(circlePts(W * 0.78, H * 0.22, 20 * S, 14, 0.3), 402, 1.5 * S, true);
-  stroke(1.3, 'rgba(244,234,214,0.25)');
+  var worlds = [
+    [0.17, 0.30, 20, 'rgba(158,200,176,0.3)', 0.0045, 0],
+    [0.78, 0.22, 12, 'rgba(224,184,120,0.3)', 0.0030, 1],
+    [0.46, 0.11, 8,  'rgba(200,170,190,0.26)', 0.0065, 0],
+    [0.90, 0.46, 6,  'rgba(158,200,176,0.22)', 0.0021, 0],
+    [0.06, 0.50, 5,  'rgba(224,184,120,0.2)',  0.0016, 0]
+  ];
+  for (var wi = 0; wi < worlds.length; wi++) {
+    var wd = worlds[wi];
+    var wx = ((wd[0] + t * wd[4]) % 1.16 - 0.08) * W;
+    var wy = H * wd[1] + Math.sin(t * 0.3 + wi) * 3 * S;
+    inkBlob(wx, wy, wd[2] * S, 400 + wi, wd[3], 1, 1, 1.3);
+    if (wd[5]) {
+      inkPath(circlePts(wx, wy, wd[2] * 1.7 * S, 14, 0.3), 460 + wi, 1.5 * S, true);
+      stroke(1.3, 'rgba(244,234,214,0.25)');
+    }
+  }
+  /* dust drifting up off the surface */
+  for (var dm = 0; dm < 16; dm++) {
+    var dph = (t * (0.05 + hash(dm, 81) * 0.06) + hash(dm, 82)) % 1;
+    var dx2 = (hash(dm, 83) * 1.1 - 0.05) * W + Math.sin(t * 0.5 + dm) * 14 * S;
+    var dy2 = gr.base - dph * H * 0.5;
+    ctx.globalAlpha = Math.sin(dph * Math.PI) * 0.3;
+    ctx.fillStyle = CREAM;
+    ctx.beginPath(); ctx.arc(dx2, dy2, (0.9 + hash(dm, 84) * 1.4) * S, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
   if (G.sunsetT > 0) {
     var sa = Math.min(1, G.sunsetT / 1.2) * 0.5;
     var sg = ctx.createLinearGradient(0, H * 0.25, 0, H);
@@ -1993,6 +2066,28 @@ function drawSky() {
     }
   }
 }
+/* a volcano. live ones breathe smoke; the dead one just sits there. */
+function drawVolcano(x, sc, seed) {
+  var y = groundY(x), u = 20 * S * sc, dead = (seed === 1);
+  inkPath([[x - u * 1.25, y], [x - u * 0.42, y - u * 1.0],
+           [x + u * 0.42, y - u * 1.0], [x + u * 1.25, y]], 560 + seed, 1.6 * S, true);
+  ctx.save(); ctx.translate(1.4 * S, 0);
+  wash(dead ? '#4a4b46' : '#5c4336', 0.92);
+  ctx.restore();
+  inkPath([[x - u * 1.25, y], [x - u * 0.42, y - u * 1.0],
+           [x + u * 0.42, y - u * 1.0], [x + u * 1.25, y]], 562 + seed, 1.6 * S, true);
+  stroke(2.2);
+  inkPath([[x - u * 0.42, y - u * 1.0], [x, y - u * 0.86], [x + u * 0.42, y - u * 1.0]], 564 + seed, 1.2 * S);
+  stroke(2, dead ? '#6b6c66' : '#7a5442');
+  if (!dead) {
+    glow(x, y - u * 1.05, u * 0.9, '#e08a50', 0.3 + Math.sin(G.t * 1.7 + seed) * 0.08);
+    for (var i = 0; i < 3; i++) {
+      var ph = ((G.t * 0.2 + i / 3 + seed * 0.37) % 1);
+      glow(x + Math.sin(ph * 4 + seed) * u * 0.55, y - u * 1.15 - ph * u * 2.6,
+           u * (0.5 + ph * 1.1), 'rgba(226,216,196,0.9)', Math.sin(ph * Math.PI) * 0.17);
+    }
+  }
+}
 var planetTex = null;
 function buildPlanet() {
   var c = document.createElement('canvas');
@@ -2004,17 +2099,49 @@ function buildPlanet() {
   for (var x = -20; x <= W + 20; x += Math.max(14, W / 48)) g.lineTo(x, groundY(x));
   g.lineTo(W + 20, H + 30); g.lineTo(-20, H + 30); g.closePath();
   var lg = g.createLinearGradient(0, gr.base - 20 * S, 0, H);
-  lg.addColorStop(0, PLANET); lg.addColorStop(1, PLANET2);
+  lg.addColorStop(0, '#39635a');
+  lg.addColorStop(0.3, PLANET);
+  lg.addColorStop(1, PLANET2);
   g.fillStyle = lg; g.fill();
   g.save(); g.clip();
-  for (var i = 0; i < 10; i++) {
-    g.globalAlpha = 0.06;
-    g.fillStyle = '#ffffff';
+
+  /* rolling ground: bands that follow the curve of the world */
+  for (var bd = 1; bd <= 3; bd++) {
+    var off = bd * (H - gr.base) * 0.26;
+    g.beginPath();
+    g.moveTo(-20, groundY(-20) + off);
+    for (var bx = -20; bx <= W + 20; bx += Math.max(16, W / 40)) {
+      g.lineTo(bx, groundY(bx) + off + Math.sin(bx * 0.004 + bd) * 5 * S);
+    }
+    g.lineTo(W + 20, H + 30); g.lineTo(-20, H + 30); g.closePath();
+    g.globalAlpha = 0.09;
+    g.fillStyle = bd === 2 ? '#15332f' : '#1b3c36';
+    g.fill();
+    g.globalAlpha = 0.14;
+    g.strokeStyle = 'rgba(190,230,210,0.5)';
+    g.lineWidth = 1.2 * S;
+    g.stroke();
+  }
+
+  /* craters and worn patches */
+  for (var i = 0; i < 16; i++) {
+    g.globalAlpha = 0.05 + hash(i, 15) * 0.04;
+    g.fillStyle = hash(i, 16) < 0.45 ? '#ffffff' : '#0d241f';
     g.beginPath();
     g.ellipse(hash(i, 11) * W, gr.base + hash(i, 12) * (H - gr.base) * 1.1,
-              (12 + hash(i, 13) * 28) * S, (4 + hash(i, 14) * 8) * S, 0, 0, 6.2832);
+              (10 + hash(i, 13) * 30) * S, (3 + hash(i, 14) * 8) * S, 0, 0, 6.2832);
     g.fill();
   }
+  /* small stones */
+  for (var st = 0; st < 22; st++) {
+    g.globalAlpha = 0.13;
+    g.fillStyle = '#9ec8b0';
+    g.beginPath();
+    g.ellipse(hash(st, 21) * W, gr.base + 6 * S + hash(st, 22) * (H - gr.base) * 0.9,
+              (1.4 + hash(st, 23) * 2.6) * S, (1 + hash(st, 24) * 1.6) * S, 0, 0, 6.2832);
+    g.fill();
+  }
+  g.globalAlpha = 1;
   g.restore();
   planetTex = c;
 }
@@ -2044,20 +2171,33 @@ function drawPlanetBody() {
   inkPath(lp, 502, 2 * S);
   stroke(1.5, 'rgba(244,234,214,0.3)');
   ctx.restore();
-  /* little tufts of grass */
-  for (var k = 0; k < 22; k++) {
-    var gx = (k / 22) * W + hash(k, 1) * 26 * S;
+  /* his three volcanoes: two that still work, one that went out.
+     Kept at the very edges so they never crowd the catching. */
+  drawVolcano(W * 0.072, 1, 0);
+  drawVolcano(W * 0.132, 0.7, 1);
+  drawVolcano(W * 0.935, 0.86, 2);
+
+  /* grass, and the occasional small flower */
+  for (var k = 0; k < 30; k++) {
+    var gx = (k / 30) * W + hash(k, 1) * 22 * S;
     var gy = groundY(gx) + 1.5 * S;
-    var gh = (3 + hash(k, 3) * 5) * S;
+    var gh = (3 + hash(k, 3) * 6) * S;
     inkPath([[gx, gy], [gx + (hash(k, 2) - 0.5) * 5 * S, gy - gh]], 510 + k, 0.8 * S);
     stroke(1.6, 'rgba(120,170,130,0.55)');
+    if (hash(k, 4) < 0.22) {
+      var fx = gx + (hash(k, 5) - 0.5) * 4 * S, fy = gy - gh - 1.6 * S;
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = hash(k, 6) < 0.5 ? '#e0b878' : '#bfd9c8';
+      ctx.beginPath(); ctx.arc(fx, fy, 1.7 * S, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
   }
 }
 function drawKeptTrinkets() {
   var list = save.trinkets;
   for (var i = 0; i < list.length; i++) {
     var f = (i + 1) / (list.length + 1);
-    var x = W * (0.06 + f * 0.88);
+    var x = W * (0.16 + f * 0.74);
     /* keep them clear of the rose */
     if (Math.abs(x - G.roseX) < 54 * S) x += 70 * S * (x < G.roseX ? -1 : 1);
     ctx.globalAlpha = 0.9;
@@ -2428,32 +2568,159 @@ function screenFinale() {
   }
 }
 
+/* A sheet of paper, laid down slightly crooked. Leaves its transform applied —
+   the caller draws the contents and must call ctx.restore() when done. */
+function paperCard(x, y, w, h, rot, seed) {
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-(x + w / 2), -(y + h / 2));
+  var pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  ctx.save(); ctx.translate(5 * S, 6 * S);
+  inkPath(pts, seed, 2 * S, true); wash('rgba(0,0,0,0.3)', 1);
+  ctx.restore();
+  inkPath(pts, seed + 1, 2.2 * S, true); wash(CREAM, 0.97);
+  if (paperTex) {
+    ctx.save(); inkPath(pts, seed + 1, 2.2 * S, true); ctx.clip();
+    ctx.globalAlpha = 0.6; ctx.drawImage(paperTex, 0, 0, W, H); ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  inkPath(pts, seed + 2, 2.2 * S, true); stroke(2.4, INK);
+  /* binding rings down the left edge */
+  for (var i = 0; i < 7; i++) {
+    var ry = y + h * (0.1 + i * 0.133);
+    ctx.globalAlpha = 0.5;
+    inkPath(circlePts(x + 11 * S, ry, 3.4 * S, 9), seed + 10 + i, 0.6 * S, true);
+    stroke(1.5, INK);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* a very small rose, for the top of the little world */
+function miniRose(x, y, sc, t) {
+  inkPath([[x, y], [x - 1.5 * sc, y - 9 * sc], [x, y - 17 * sc]], 620, 0.8 * S);
+  stroke(2.2, '#5e8a6a');
+  inkPath([[x, y - 8 * sc], [x + 7 * sc, y - 12 * sc], [x + 2 * sc, y - 6 * sc]], 621, 0.9 * S, true);
+  wash('#6f9c74', 0.92); stroke(1.5, INK);
+  for (var i = 0; i < 5; i++) {
+    var a = i / 5 * 6.2832 + t * 0.2;
+    inkBlob(x + Math.cos(a) * 3.4 * sc, y - 17 * sc + Math.sin(a) * 3.2 * sc,
+            3.6 * sc, 624 + i, '#b02b42', 0.95, 1, 1.4);
+  }
+  inkBlob(x, y - 17 * sc, 2.4 * sc, 630, RED, 0.96, 1, 1.3);
+}
+
 function screenPlanet() {
-  ctx.globalAlpha = 0.6; ctx.fillStyle = '#0a1a22'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+  var t = G.t;
+  ctx.globalAlpha = 0.84; ctx.fillStyle = '#0a1a22'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+
   text('her planet', W / 2, 40 * S, 28, CREAM);
-  var lx = W * 0.27, rx = W * 0.73, y0 = 76 * S;
+  var sub = save.high > 0 ? 'best  ' + save.high : 'nothing kept yet';
+  if (save.highEndless > 0) sub += '   ·   endless  ' + save.highEndless;
+  text(sub, W / 2, 59 * S, 12, BONE, 'center', true, 0.7);
 
-  text('things you kept  ' + save.trinkets.length + '/' + TRINKETS.length, lx, y0, 14, SAND, 'center', true);
-  for (var i = 0; i < TRINKETS.length; i++) {
+  /* ---------------------------------------------- the little world itself */
+  var cx = W * 0.25, cy = H * 0.47, R = Math.min(W * 0.115, H * 0.165);
+  var rot = t * 0.1;
+
+  glow(cx, cy, R * 2.1, 'rgba(150,210,195,0.5)', 0.16);
+  /* the body */
+  inkPath(circlePts(cx, cy, R, 30), 600, R * 0.035, true);
+  var lg = ctx.createLinearGradient(cx, cy - R, cx, cy + R);
+  lg.addColorStop(0, '#3d6a60'); lg.addColorStop(1, PLANET2);
+  ctx.fillStyle = lg; ctx.fill();
+  ctx.save();
+  inkPath(circlePts(cx, cy, R, 30), 600, R * 0.035, true); ctx.clip();
+  for (var k = 0; k < 10; k++) {
+    ctx.globalAlpha = 0.07;
+    ctx.fillStyle = hash(k, 31) < 0.5 ? '#ffffff' : '#0d241f';
+    ctx.beginPath();
+    ctx.ellipse(cx + (hash(k, 32) - 0.5) * R * 1.8, cy + (hash(k, 33) - 0.5) * R * 1.8,
+                R * (0.1 + hash(k, 34) * 0.3), R * 0.08, hash(k, 35) * 3, 0, 6.2832);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  inkPath(circlePts(cx, cy, R, 30), 601, R * 0.035, true);
+  stroke(2.6, INK);
+
+  /* everything she has ever kept, standing on it */
+  var n = TRINKETS.length;
+  for (var i = 0; i < n; i++) {
+    var a = rot + (i / n) * 6.2832 - Math.PI / 2;
+    var px = cx + Math.cos(a) * R, py = cy + Math.sin(a) * R;
     var has = save.trinkets.indexOf(TRINKETS[i]) >= 0;
-    var yy = y0 + 22 * S + i * 15.5 * S;
-    if (yy > H - 60 * S) break;
-    text(has ? trinketName(TRINKETS[i]) : '· · ·', lx, yy, 12, has ? CREAM : BONE, 'center', true, has ? 0.95 : 0.3);
+    ctx.save();
+    ctx.translate(px, py); ctx.rotate(a + Math.PI / 2); ctx.translate(-px, -py);
+    if (has) {
+      drawTrinket(TRINKETS[i], px, py, 0.4, t);
+    } else {
+      ctx.globalAlpha = 0.22;
+      ctx.setLineDash([3 * S, 3 * S]);
+      inkPath([[px - 4 * S, py], [px - 4 * S, py - 11 * S], [px + 4 * S, py - 11 * S], [px + 4 * S, py]], 640 + i, 0.6 * S);
+      stroke(1.6, CREAM);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+  /* and the rose on top, always */
+  miniRose(cx, cy - R + 1 * S, S * 1.15, t);
+
+  text('things you kept', cx, cy + R + 34 * S, 14, SAND, 'center', true);
+  text(save.trinkets.length + ' of ' + n, cx, cy + R + 56 * S, 22, CREAM);
+  var latest = save.trinkets.length ? trinketName(save.trinkets[save.trinkets.length - 1]) : 'catch one and it stays here';
+  text(latest, cx, cy + R + 76 * S, 11, BONE, 'center', true, 0.75);
+
+  /* ---------------------------------------------------- the notes, on paper */
+  var frags = fragmentList();
+  var px0 = W * 0.495, py0 = H * 0.155, pw = W * 0.44, ph = H * 0.605;
+  paperCard(px0, py0, pw, ph, -0.014, 660);
+  var tx = px0 + pw * 0.54, inner = pw - 54 * S;
+  text('the notes', tx, py0 + 30 * S, 17, INK);
+  text(save.fragments.length + ' of ' + frags.length + ' found',
+       tx, py0 + 48 * S, 11, '#7a6354', 'center', true);
+  inkPath([[px0 + 30 * S, py0 + 58 * S], [px0 + pw - 18 * S, py0 + 58 * S]], 670, 1.2 * S);
+  stroke(1.4, 'rgba(58,42,34,0.35)');
+
+  var y = py0 + 80 * S, lineH = 16 * S, more = 0;
+  for (var f = 0; f < frags.length; f++) {
+    var got = save.fragments.indexOf(f) >= 0;
+    if (y > py0 + ph - 26 * S) { more++; continue; }
+    if (got) {
+      var ls = wrap(frags[f], 12.5, inner);
+      for (var j = 0; j < ls.length; j++) {
+        if (y > py0 + ph - 26 * S) { more++; break; }
+        text(ls[j], tx, y, 12.5, INK, 'center', false, 0.95);
+        y += lineH;
+      }
+      y += 6 * S;
+    } else {
+      ctx.globalAlpha = 0.25;
+      ctx.setLineDash([5 * S, 5 * S]);
+      inkPath([[tx - inner * 0.42, y - 4 * S], [tx + inner * 0.42, y - 4 * S]], 680 + f, 0.8 * S);
+      stroke(1.6, INK);
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      y += lineH + 4 * S;
+    }
+  }
+  if (more > 0) text('…', tx, py0 + ph - 12 * S, 14, INK, 'center', false, 0.6);
+  ctx.restore();                 /* the card's transform ends here */
+
+  var l2 = cfg('letter2', []);
+  if (save.letter2 > 0) {
+    text('the long letter — ' + save.letter2 + ' of ' + l2.length + ' lines',
+         cx, H - 24 * S, 11, SAND, 'center', true, 0.8);
   }
 
-  var frags = fragmentList();
-  text('notes you found  ' + save.fragments.length + '/' + frags.length, rx, y0, 14, SAND, 'center', true);
-  var yy2 = y0 + 22 * S;
-  for (var k = 0; k < frags.length; k++) {
-    var got = save.fragments.indexOf(k) >= 0;
-    if (yy2 > H - 60 * S) break;
-    if (got) {
-      var ls = wrap(frags[k], 12, W * 0.42);
-      for (var j = 0; j < ls.length; j++) { text(ls[j], rx, yy2, 12, CREAM, 'center', true, 0.95); yy2 += 15 * S; }
-      yy2 += 4 * S;
-    } else { text('· · ·', rx, yy2, 12, BONE, 'center', true, 0.3); yy2 += 15 * S; }
+  var bw = Math.min(150 * S, W * 0.2);
+  var showLetter = save.finale || save.letter2 > 0;
+  var by2 = H - 26 * S, bx2 = W * 0.64;
+  if (showLetter) {
+    button('back', bx2 - bw * 0.58, by2, bw, 30 * S, function () { G.screen = 'menu'; });
+    button('the letter', bx2 + bw * 0.58, by2, bw, 30 * S, function () { G.screen = 'letter'; });
+  } else {
+    button('back', bx2, by2, bw, 30 * S, function () { G.screen = 'menu'; });
   }
-  button('back', W / 2, H - 30 * S, Math.min(150 * S, W * 0.22), 32 * S, function () { G.screen = 'menu'; });
 }
 
 function screenLetter() {
@@ -2487,6 +2754,8 @@ function screenLetter() {
 
 /* ============================ frame ====================================== */
 function frame() {
+  /* start every frame from a known transform, whatever happened in the last one */
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (G.screen !== G.lastScreen) { G.lastScreen = G.screen; G.sel = 0; }
   buttons.length = 0;
   ctx.save();
@@ -2527,9 +2796,11 @@ function frame() {
     drawFlyers();
     drawDarkPass();
     drawPops();
-  } else {
+  } else if (G.screen === 'menu') {
     drawRose(W * 0.80, save.finale ? 1 : 0.4, G.t, false, 1.18);
     if (amb) drawPrince(amb, false);
+    drawParts(); drawRings(); drawPops();
+  } else {
     drawParts(); drawRings(); drawPops();
   }
   ctx.restore();
