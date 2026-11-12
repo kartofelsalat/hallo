@@ -1900,6 +1900,29 @@ function tick(ts) {
 }
 
 /* ============================ boot ======================================= */
+/* some hosts re-wrap the document and drop the head tags; put them back, so
+   Add to Home Screen still gives a fullscreen app */
+(function ensureHead() {
+  var want = [
+    ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
+    ['meta', { name: 'mobile-web-app-capable', content: 'yes' }],
+    ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }],
+    ['meta', { name: 'apple-mobile-web-app-title', content: 'Catch My Love' }],
+    ['meta', { name: 'theme-color', content: '#0f2c38' }],
+    ['meta', { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover' }],
+    ['link', { rel: 'apple-touch-icon', href: 'icons/icon-180.png' }],
+    ['link', { rel: 'manifest', href: 'manifest.webmanifest' }]
+  ];
+  for (var i = 0; i < want.length; i++) {
+    var tag = want[i][0], at = want[i][1];
+    var sel = tag + (at.name ? '[name="' + at.name + '"]' : '[rel="' + at.rel + '"]');
+    var el = document.head.querySelector(sel);
+    if (!el) { el = document.createElement(tag); document.head.appendChild(el); }
+    for (var k in at) el.setAttribute(k, at[k]);
+  }
+  if (!document.title) document.title = 'Catch My Love';
+})();
+
 resize();
 G.roseX = W * 0.5;
 G.prince = newPrince();
