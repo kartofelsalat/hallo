@@ -31,3 +31,20 @@ Drag anywhere to walk. Catch hearts and stars to fill the watering can. **Stand 
 on the rose to pour** — that is where the points come from, multiplied by your catch
 streak. Anything you miss sprouts a baobab; three grown baobabs end the run. Pouring
 weeds one. Stand still near the fox to tame him.
+
+## Hosting on Netlify
+
+The repo is a static site with no build step, so Netlify needs no configuration
+beyond the `netlify.toml` already here (`publish = "."`, no build command).
+
+Two ways:
+
+1. **Link the repo** at app.netlify.com → *Add new site* → *Import an existing project*
+   → GitHub → `kartofelsalat/hallo`. **Set *Branch to deploy* to the branch holding the
+   game** — the repo's default branch does not have it. Every push then redeploys,
+   so editing `content.js` on GitHub updates the live game by itself.
+2. **Drag and drop** the project folder onto app.netlify.com/drop. No account needed
+   for the first deploy, but future changes mean dropping the folder again.
+
+Then rename the site in *Site configuration* so the link is something like
+`catchmylove.netlify.app`, and open that on the iPad.

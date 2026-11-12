@@ -1,0 +1,26 @@
+# Catch My Love — a static site, nothing to build.
+[build]
+  publish = "."
+  command = ""
+
+# The service worker must never be served stale, or an update never lands.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# content.js holds the personal text and gets edited most; keep it fresh too.
+[[headers]]
+  for = "/content.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
