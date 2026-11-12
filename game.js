@@ -43,6 +43,7 @@ function resize() {
   buildStars();
   buildPlanet();
   buildPaperTex();
+  buildVignette();
   skyKey = '';
 }
 window.addEventListener('resize', resize);
@@ -275,6 +276,18 @@ function buildStars() {
   g.globalAlpha = 1;
   starfield = c;
 }
+var vignette = null;
+function buildVignette() {
+  var c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(W / 2)); c.height = Math.max(1, Math.round(H / 2));
+  var g = c.getContext('2d');
+  var rg = g.createRadialGradient(c.width / 2, c.height * 0.46, Math.min(c.width, c.height) * 0.36,
+                                  c.width / 2, c.height * 0.5, Math.max(c.width, c.height) * 0.78);
+  rg.addColorStop(0, 'rgba(0,0,0,0)');
+  rg.addColorStop(1, 'rgba(6,16,24,0.55)');
+  g.fillStyle = rg; g.fillRect(0, 0, c.width, c.height);
+  vignette = c;
+}
 var paperTex = null;
 function buildPaperTex() {
   if (!paper) return;
@@ -340,122 +353,176 @@ function groundY(x) {
 /* ============================ the prince ================================= */
 function drawPrince(p, dark) {
   var x = p.x, y = groundY(p.x);
-  var hh = 20 * S;                                /* head radius-ish unit */
-  var bob = Math.sin(p.walk * 7) * 1.6 * S * Math.min(1, Math.abs(p.vx) / 120);
-  var bodyTop = y - hh * 2.05 + bob;
-  var headY = bodyTop - hh * 0.72;
-  var seed = 11;
-  var ic = dark ? 'rgba(244,234,214,0.85)' : INK;
+  var u = 21 * S;
+  var spd = Math.min(1, Math.abs(p.vx) / (220 * S));
+  var lean = clamp(p.vx / (420 * S), -0.22, 0.22);
+  var bob = Math.sin(p.walk * 7) * 1.7 * S * spd;
+  var hipY = y - u * 0.92 + bob;
+  var shoulderY = y - u * 2.0 + bob;
+  var headY = shoulderY - u * 0.66;
+  var ic = dark ? 'rgba(244,234,214,0.9)' : INK;
+  var coatC = dark ? '#2e5b63' : MINT;
+  var hairC = dark ? 'rgba(240,196,106,0.85)' : GOLD;
+  var skin  = dark ? '#e8dcc0' : '#f7e9cd';
 
-  /* scarf — trails behind, and its tip can catch things */
   ctx.save();
-  for (var i = p.scarf.length - 1; i > 0; i--) {
-    var a = p.scarf[i], b = p.scarf[i - 1];
-    ctx.beginPath();
-    ctx.moveTo(a.x + jx(31, i, 1.2 * S), a.y + jy(31, i, 1.2 * S));
-    ctx.lineTo(b.x, b.y);
-    ctx.lineWidth = (7.0 - i * 0.55) * S;
-    ctx.strokeStyle = dark ? 'rgba(200,50,74,0.55)' : '#b8475c';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-  }
-  ctx.restore();
+  ctx.translate(x, y);
+  ctx.rotate(lean * 0.35);
+  ctx.translate(-x, -y);
+
+  /* the cape, behind everything, swinging against the walk */
+  var sw = -Math.sign(p.vx || 1);
+  var flare = (0.5 + spd) * u * 0.8;
+  var cape = [[x, shoulderY - u * 0.1],
+              [x + sw * (u * 0.5 + flare * 0.5), shoulderY + u * 0.5],
+              [x + sw * (u * 0.62 + flare), hipY + u * 0.55],
+              [x + sw * u * 0.1, hipY + u * 0.35]];
+  inkPath(cape, 20, 2 * S, true);
+  wash(dark ? '#1f4149' : '#7fb0a0', 0.92);
+  inkPath(cape, 21, 2 * S, true);
+  stroke(2.1, ic);
+
+  /* the scarf streams from the neck */
+  drawScarf(p, 0, dark);
 
   /* legs */
-  var sw = Math.sin(p.walk * 7) * 7 * S * Math.min(1, Math.abs(p.vx) / 110);
-  inkPath([[x - 3 * S, y - hh * 0.75], [x - 4 * S + sw, y]], seed + 2, 1.3 * S);
+  var step = Math.sin(p.walk * 7) * 8 * S * spd;
+  inkPath([[x - u * 0.17, hipY], [x - u * 0.2 + step, y]], 22, 1.3 * S); stroke(2.8, ic);
+  inkPath([[x + u * 0.17, hipY], [x + u * 0.2 - step, y]], 23, 1.3 * S); stroke(2.8, ic);
+  inkPath([[x - u * 0.3 + step, y], [x - u * 0.08 + step, y]], 24, 1 * S); stroke(3, ic);
+  inkPath([[x + u * 0.08 - step, y], [x + u * 0.3 - step, y]], 25, 1 * S); stroke(3, ic);
+
+  /* the coat: narrow at the shoulders, flared at the hem */
+  var coat = [[x - u * 0.34, shoulderY + u * 0.06],
+              [x + u * 0.34, shoulderY + u * 0.06],
+              [x + u * 0.56, hipY + u * 0.14],
+              [x - u * 0.56, hipY + u * 0.14]];
+  inkPath(coat, 26, 1.7 * S, true);
+  ctx.save(); ctx.translate(1.3 * S, 1.5 * S); wash(coatC, 0.92); ctx.restore();
+  inkPath(coat, 27, 1.7 * S, true);
   stroke(2.4, ic);
-  inkPath([[x + 3 * S, y - hh * 0.75], [x + 4 * S - sw, y]], seed + 3, 1.3 * S);
-  stroke(2.4, ic);
+  /* belt */
+  inkPath([[x - u * 0.42, hipY - u * 0.18], [x + u * 0.42, hipY - u * 0.18]], 28, 1 * S);
+  stroke(2.2, dark ? ic : '#6f9c84');
+  /* a hem that catches the light */
+  inkPath([[x - u * 0.54, hipY + u * 0.12], [x + u * 0.54, hipY + u * 0.12]], 29, 1.2 * S);
+  stroke(1.6, 'rgba(244,234,214,0.45)');
 
-  /* coat */
-  var coat = [[x - hh * 0.62, y - hh * 0.72], [x - hh * 0.44, bodyTop],
-              [x + hh * 0.44, bodyTop], [x + hh * 0.62, y - hh * 0.72]];
-  inkPath(coat, seed + 4, 1.7 * S, true);
-  ctx.save(); ctx.translate(1.2 * S, 1.4 * S); wash(dark ? '#2e5b63' : MINT, 0.9); ctx.restore();
-  inkPath(coat, seed + 5, 1.7 * S, true);
-  stroke(2.3, ic);
+  /* arms */
+  inkPath([[x - u * 0.3, shoulderY + u * 0.2], [x - u * 0.72, shoulderY + u * 0.52],
+           [x - u * 0.78, shoulderY + u * 0.1]], 30, 1.4 * S);
+  stroke(2.7, ic);
+  inkPath([[x + u * 0.3, shoulderY + u * 0.16], [x + u * 0.74, shoulderY - u * 0.12]], 32, 1.4 * S);
+  stroke(2.7, ic);
 
-  /* arms — reaching up, holding the can */
-  inkPath([[x - hh * 0.5, bodyTop + hh * 0.3], [x - hh * 0.95, bodyTop - hh * 0.25]], seed + 6, 1.4 * S);
-  stroke(2.3, ic);
-  inkPath([[x + hh * 0.5, bodyTop + hh * 0.3], [x + hh * 0.95, bodyTop - hh * 0.2]], seed + 7, 1.4 * S);
-  stroke(2.3, ic);
+  /* head */
+  inkBlob(x, headY, u * 0.62, 33, skin, 0.96, 1.02, 2.3);
+  /* a crown of curls instead of spikes */
+  for (var k = 0; k < 8; k++) {
+    var ang = -Math.PI * 1.04 + k / 7 * Math.PI * 1.08;
+    var rr = u * (0.26 + (k % 2) * 0.07);
+    inkBlob(x + Math.cos(ang) * u * 0.58, headY + Math.sin(ang) * u * 0.56,
+            rr, 40 + k, hairC, 0.95, 1, 1.7);
+  }
+  inkBlob(x - u * 0.52, headY + u * 0.3, u * 0.17, 50, hairC, 0.95, 1, 1.5);
+  inkBlob(x + u * 0.52, headY + u * 0.28, u * 0.16, 51, hairC, 0.95, 1, 1.5);
 
-  /* the watering can, fills up as she catches */
-  var canX = x + hh * 1.08, canY = bodyTop - hh * 0.1;
-  var cw = hh * 0.84, ch = hh * 0.68;
-  var canPts = [[canX - cw / 2, canY - ch / 2], [canX + cw / 2, canY - ch / 2],
-                [canX + cw / 2, canY + ch / 2], [canX - cw / 2, canY + ch / 2]];
-  inkPath(canPts, 71, 1.3 * S, true);
-  wash(dark ? '#3a5f66' : BONE, 0.92);
+  /* face */
+  var look = clamp(p.vx / 220, -1, 1) * 2.2 * S;
+  ctx.globalAlpha = dark ? 0.5 : 0.75;
+  ctx.fillStyle = '#e59a9a';
+  ctx.beginPath(); ctx.ellipse(x - u * 0.32 + look, headY + u * 0.16, u * 0.13, u * 0.09, 0, 0, 6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + u * 0.3 + look, headY + u * 0.16, u * 0.13, u * 0.09, 0, 0, 6.2832); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = ic;
+  var blink = (Math.sin(G.t * 0.9) > 0.985) ? 0.25 : 1;
+  ctx.beginPath(); ctx.ellipse(x - u * 0.18 + look, headY - u * 0.02, 2.1 * S, 2.1 * S * blink, 0, 0, 6.2832); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + u * 0.18 + look, headY - u * 0.02, 2.1 * S, 2.1 * S * blink, 0, 0, 6.2832); ctx.fill();
+  if (!dark) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(x - u * 0.22 + look, headY - u * 0.07, 0.8 * S, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + u * 0.14 + look, headY - u * 0.07, 0.8 * S, 0, 6.2832); ctx.fill();
+  }
+  inkPath([[x - u * 0.09 + look, headY + u * 0.26], [x + look, headY + u * 0.31],
+           [x + u * 0.09 + look, headY + u * 0.26]], 52, 0.8 * S);
+  stroke(1.8, ic);
+
+  /* the watering can */
+  var canX = x + u * 0.96, canY = shoulderY - u * 0.12;
+  var cw = u * 0.72, ch = u * 0.58;
+  var canPts = [[canX - cw / 2, canY - ch / 2], [canX + cw / 2, canY - ch * 0.56],
+                [canX + cw * 0.44, canY + ch / 2], [canX - cw * 0.44, canY + ch / 2]];
+  inkPath(canPts, 71, 1.2 * S, true);
+  wash(dark ? '#3a5f66' : BONE, 0.94);
   if (p.water > 0) {
     var fr = Math.min(1, p.water / CAN_MAX);
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(canX - cw / 2, canY + ch / 2 - ch * fr, cw, ch * fr);
-    ctx.clip();
-    inkPath(canPts, 71, 1.3 * S, true);
+    ctx.beginPath(); ctx.rect(canX - cw, canY + ch / 2 - ch * fr, cw * 2, ch * fr); ctx.clip();
+    inkPath(canPts, 71, 1.2 * S, true);
     wash('#6fb8c8', 0.95);
     ctx.restore();
   }
-  inkPath(canPts, 71, 1.3 * S, true);
+  inkPath(canPts, 71, 1.2 * S, true);
   stroke(2.2, ic);
-  /* spout */
-  inkPath([[canX + cw * 0.5, canY - ch * 0.1], [canX + cw * 1.05, canY - ch * 0.5],
-           [canX + cw * 1.25, canY - ch * 0.34]], 72, 1.1 * S);
+  inkPath([[canX + cw * 0.46, canY - ch * 0.2], [canX + cw * 0.95, canY - ch * 0.62],
+           [canX + cw * 1.12, canY - ch * 0.44]], 72, 1 * S);
   stroke(2.4, ic);
-  /* handle */
-  inkPath([[canX - cw * 0.34, canY - ch * 0.5], [canX, canY - ch * 1.05], [canX + cw * 0.34, canY - ch * 0.5]], 73, 1.1 * S);
+  inkPath([[canX - cw * 0.3, canY - ch * 0.5], [canX, canY - ch * 1.0], [canX + cw * 0.3, canY - ch * 0.52]], 73, 1 * S);
   stroke(2, ic);
-
-  /* head */
-  inkBlob(x, headY, hh * 0.72, seed + 8, dark ? '#e8dcc0' : '#f6e7c8', 0.95, 1, 2.2);
-  /* hair tufts */
-  for (var k = 0; k < 6; k++) {
-    var ang = -Math.PI * 0.95 + k / 5 * Math.PI * 0.9;
-    var r0 = hh * 0.6, r1 = hh * (0.84 + (k % 2) * 0.1);
-    inkPath([[x + Math.cos(ang) * r0 * 0.9, headY + Math.sin(ang) * r0 * 0.9],
-             [x + Math.cos(ang - 0.22) * r1, headY + Math.sin(ang - 0.22) * r1]], 90 + k, 1.2 * S);
-    stroke(3.4, dark ? 'rgba(240,196,106,0.8)' : GOLD);
-  }
-  /* face — two dots and a line */
-  var look = Math.max(-1, Math.min(1, p.vx / 200));
-  ctx.fillStyle = ic;
-  ctx.beginPath(); ctx.arc(x - hh * 0.22 + look * 2 * S, headY - hh * 0.04, 1.9 * S, 0, 6.2832); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + hh * 0.22 + look * 2 * S, headY - hh * 0.04, 1.9 * S, 0, 6.2832); ctx.fill();
-  inkPath([[x - hh * 0.13 + look * 2 * S, headY + hh * 0.3], [x + hh * 0.13 + look * 2 * S, headY + hh * 0.3]], 99, 1 * S);
-  stroke(1.7, ic);
+  ctx.restore();
 }
 
 /* ============================ the rose =================================== */
 function drawRose(x, bloom, t, dark, scale) {
   var sc = (scale || 1) * S;
   var y = groundY(x);
+  var h = 58 * sc;
+  var sway = Math.sin(t * 0.8) * 2.4 * sc;
+  var stemC = dark ? 'rgba(158,200,176,0.85)' : '#5e8a6a';
+
   /* stem */
-  var h = 54 * sc;
-  inkPath([[x, y], [x - 2 * sc, y - h * 0.45], [x + 1.5 * sc, y - h * 0.8], [x, y - h]], 140, 1.5 * S);
-  stroke(2.6, dark ? 'rgba(158,200,176,0.8)' : '#5e8a6a');
-  /* leaves */
-  for (var s = -1; s <= 1; s += 2) {
-    inkPath([[x, y - h * 0.5], [x + s * 15 * sc, y - h * 0.62], [x + s * 6 * sc, y - h * 0.38]], 141 + s, 1.6 * S, true);
-    wash('#6f9c74', 0.9);
-    stroke(2, dark ? 'rgba(58,42,34,0.7)' : INK);
+  inkPath([[x, y], [x - 2.4 * sc, y - h * 0.4], [x + 2 * sc + sway * 0.4, y - h * 0.74],
+           [x + sway, y - h]], 140, 1.3 * S);
+  stroke(3, stemC);
+  /* two leaves, growing out of the stem */
+  for (var s2 = -1; s2 <= 1; s2 += 2) {
+    var f = (s2 < 0 ? 0.4 : 0.58);
+    var ly = y - h * f;
+    var lx = x + (-2.4 * sc) * (1 - f) + (2 * sc + sway * 0.4) * f;   /* follow the stem */
+    var tipx = lx + s2 * 17 * sc, tipy = ly - 8 * sc;
+    inkPath([[lx, ly + 1.5 * sc],
+             [lx + s2 * 8 * sc, ly - 5.5 * sc],
+             [tipx, tipy],
+             [lx + s2 * 9 * sc, ly + 3.5 * sc]], 141 + s2, 1.3 * S, true);
+    wash(dark ? '#4b7a5c' : '#6f9c74', 0.92);
+    stroke(2, dark ? 'rgba(58,42,34,0.8)' : INK);
+    inkPath([[lx + s2 * 1.5 * sc, ly], [tipx - s2 * 2 * sc, tipy + 1.5 * sc]], 146 + s2, 0.8 * S);
+    stroke(1.3, dark ? 'rgba(58,42,34,0.5)' : 'rgba(58,42,34,0.45)');
   }
-  /* the bloom. petals open with bloom 0..1 */
-  var by = y - h, br = (7 + bloom * 13) * sc;
-  var pet = 6;
-  for (var i = 0; i < pet; i++) {
-    var a = -Math.PI / 2 + i / pet * Math.PI * 2 + t * 0.12;
-    var open = 0.3 + bloom * 0.85;
-    var px = x + Math.cos(a) * br * open * 0.72;
-    var py = by + Math.sin(a) * br * open * 0.72;
-    inkBlob(px, py, br * 0.62, 150 + i, RED, 0.9, 1, 1.9);
+  /* sepal */
+  var by = y - h + sway * 0.2, br = (9 + bloom * 13) * sc;
+  inkPath([[x + sway - br * 0.4, by + br * 0.5], [x + sway, by + br * 1.1],
+           [x + sway + br * 0.4, by + br * 0.5]], 143, 1.3 * S, true);
+  wash('#5e8a6a', 0.92); stroke(1.9, dark ? 'rgba(58,42,34,0.8)' : INK);
+
+  if (bloom > 0.99) glow(x + sway, by, br * 3.2, RED, 0.4 + Math.sin(t * 2) * 0.12);
+
+  /* the bloom: an outer ring that opens, an inner ring, a spiral heart */
+  var cx = x + sway;
+  var outer = 6, open = 0.34 + bloom * 0.8;
+  for (var i = 0; i < outer; i++) {
+    var a = -Math.PI / 2 + i / outer * Math.PI * 2 + t * 0.07;
+    inkBlob(cx + Math.cos(a) * br * open * 0.78, by + Math.sin(a) * br * open * 0.74,
+            br * 0.6, 150 + i, '#b02b42', 0.93, 1, 1.9);
   }
-  inkBlob(x, by, br * 0.48, 160, bloom > 0.6 ? '#e05a70' : '#a8283c', 0.95, 1, 1.9);
-  if (bloom > 0.99) {
-    glow(x, by, br * 3.2, RED, 0.4 + Math.sin(t * 2) * 0.12);
+  for (var j = 0; j < 4; j++) {
+    var a2 = -Math.PI / 2 + j / 4 * Math.PI * 2 - t * 0.05;
+    inkBlob(cx + Math.cos(a2) * br * 0.34, by + Math.sin(a2) * br * 0.32,
+            br * 0.46, 158 + j, RED, 0.95, 1, 1.8);
   }
+  inkBlob(cx, by, br * 0.34, 164, bloom > 0.6 ? '#e05a70' : '#8e2134', 0.96, 1, 1.7);
+  inkPath([[cx - br * 0.14, by], [cx + br * 0.1, by - br * 0.12], [cx + br * 0.12, by + br * 0.12]], 165, 0.7 * S);
+  stroke(1.5, 'rgba(60,10,20,0.6)');
 }
 
 /* ============================ the fox ==================================== */
@@ -615,8 +682,13 @@ function drawFalling(o, t, dark) {
   switch (o.type) {
     case T_HEART:
       inkPath(heartPts(x, y, r), o.id + 1, r * 0.13, true);
-      ctx.save(); ctx.translate(r * 0.1, r * 0.12); wash('#d4607a', 0.9); ctx.restore();
-      inkPath(heartPts(x, y, r), o.id, r * 0.13, true); stroke(2);
+      ctx.save(); ctx.translate(r * 0.1, r * 0.12); wash('#c9546f', 0.92); ctx.restore();
+      inkPath(heartPts(x, y, r * 0.78), o.id + 4, r * 0.1, true);
+      wash('#e5839a', 0.5);
+      ctx.globalAlpha = 0.7; ctx.fillStyle = 'rgba(255,240,240,0.9)';
+      ctx.beginPath(); ctx.ellipse(x - r * 0.33, y - r * 0.3, r * 0.2, r * 0.13, -0.5, 0, 6.2832);
+      ctx.fill(); ctx.globalAlpha = 1;
+      inkPath(heartPts(x, y, r), o.id, r * 0.13, true); stroke(2.1);
       break;
     case T_STAR:
       inkPath(starPts(x, y, r * 1.12), o.id + 1, r * 0.12, true);
@@ -722,12 +794,17 @@ function pick(table) {
   for (i = 0; i < table.length; i++) { r -= table[i][1]; if (r <= 0) return table[i][0]; }
   return table[0][0];
 }
-function isAnniversary() {
+function annivInfo() {
   var a = cfg('anniversary', null);
-  if (!a) return false;
-  var d = new Date();
-  return (d.getMonth() + 1) === a.month && d.getDate() === a.day;
+  if (!a) return null;
+  var d = new Date(), m = d.getMonth() + 1;
+  if (d.getDate() !== a.day) return null;
+  var months = a.year ? ((d.getFullYear() - a.year) * 12 + (m - a.month)) : 0;
+  if (m === a.month) return { kind: 'year', months: months, years: a.year ? d.getFullYear() - a.year : 0 };
+  if (a.monthly && months > 0) return { kind: 'month', months: months };
+  return null;
 }
+function isAnniversary() { return !!annivInfo(); }
 function fragmentList() { var f = cfg('fragments', []); return (f && f.length) ? f : []; }
 
 /* ============================ game state ================================= */
@@ -740,7 +817,7 @@ var G = {
   spawnT: 0, dark: 0, shake: 0, flash: 0, red: 0,
   prince: null, roseX: 0, bloom: 0, pour: null, fox: null,
   foxTamed: false, foxTimer: 0, stillT: 0,
-  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null,
+  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null, lastHeart: null,
   finaleT: 0, caughtTrinkets: [], caughtFrags: [], audit: null
 };
 
@@ -763,7 +840,7 @@ function startRun(mode) {
   G.roseX = W * 0.5;
   G.bloom = 0.12;
   G.pour = null; G.fox = null; G.foxTamed = false; G.foxTimer = 14 + Math.random() * 10;
-  G.caughtTrinkets = []; G.caughtFrags = []; G.audit = null;
+  G.caughtTrinkets = []; G.caughtFrags = []; G.audit = null; G.lastHeart = null;
   G.bannerT = 2.6;
   G.hint = save.runs < 1 ? 7 : 0;
   G.anniv = isAnniversary(); G.annivDone = false;
@@ -784,7 +861,8 @@ function difficulty() {
 /* ============================ feedback =================================== */
 function pop(str, x, y, col, size) {
   var hw = textW(str, size || 15) / 2 + 12 * S;
-  G.pops.push({ s: str, x: clamp(x, hw, W - hw), y: Math.max(y, 24 * S),
+  var minY = (G.bannerT > 0) ? H * 0.48 : 24 * S;
+  G.pops.push({ s: str, x: clamp(x, hw, W - hw), y: Math.max(y, minY),
                 c: col || CREAM, t: 0, life: 1.15, size: size || 15 });
 }
 function burst(x, y, col, n, spd) {
@@ -847,14 +925,14 @@ function sprout(x) {
   /* a missed heart becomes a seed, and a seed becomes a baobab */
   for (var i = 0; i < G.baobabs.length; i++) {
     if (Math.abs(G.baobabs[i].x - x) < 34 * S) {
-      G.baobabs[i].growth = Math.min(1, G.baobabs[i].growth + 0.34);
+      G.baobabs[i].growth = Math.min(1, G.baobabs[i].growth + 0.24);
       G.baobabs[i].pulse = 1;
       sfx.seed();
       if (G.baobabs[i].growth >= 1) pop('a baobab!', G.baobabs[i].x, groundY(x) - 110 * S, RED, 16);
       return;
     }
   }
-  G.baobabs.push({ x: clamp(x, 26 * S, W - 26 * S), growth: 0.2, id: G.bid++, pulse: 1 });
+  G.baobabs.push({ x: clamp(x, 26 * S, W - 26 * S), growth: 0.14, id: G.bid++, pulse: 1 });
   sfx.seed();
 }
 
@@ -890,25 +968,58 @@ function updatePrince(dt) {
   moveScarf(p, dt);
 }
 
-var SEG = 7.0;
+var SEG = 5.6;
 function moveScarf(p, dt) {
-  var hx = p.x - Math.sign(p.vx || 1) * 7 * S, hy = groundY(p.x) - 44 * S;
+  /* anchored at the neck, each link looser and heavier than the one before,
+     so it curves instead of pointing */
+  var hx = p.x - Math.sign(p.vx || 1) * 5 * S, hy = groundY(p.x) - 52 * S;
   p.scarf[0].x = hx; p.scarf[0].y = hy;
   for (var k = 1; k < p.scarf.length; k++) {
     var a = p.scarf[k], b = p.scarf[k - 1];
-    a.x += (b.x - a.x) * Math.min(1, dt * 11) - p.vx * dt * 0.055;
-    a.y += (b.y - a.y) * Math.min(1, dt * 9) + 26 * S * dt;        /* it sags */
-    /* keep the links a fixed length so it can never stretch into a plank */
+    var stiff = Math.max(3, 13 - k * 1.1);
+    a.x += (b.x - a.x) * Math.min(1, dt * stiff) - p.vx * dt * 0.075;
+    a.y += (b.y - a.y) * Math.min(1, dt * stiff * 0.62) + (16 + k * 7) * S * dt;
     var dx = a.x - b.x, dy = a.y - b.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
     var max = SEG * S;
     if (d > max) { a.x = b.x + dx / d * max; a.y = b.y + dy / d * max; }
-    if (a.y > groundY(a.x) - 3 * S) a.y = groundY(a.x) - 3 * S;
+    if (a.y > groundY(a.x) - 4 * S) a.y = groundY(a.x) - 4 * S;
   }
+}
+/* drawn as a tapered ribbon with a ripple down its length */
+function drawScarf(p, dt, dark) {
+  var n = p.scarf.length, L = [], R = [];
+  var wind = Math.min(1, Math.abs(p.vx) / (260 * S));
+  for (var i = 0; i < n; i++) {
+    var c = p.scarf[i];
+    var a = p.scarf[Math.max(0, i - 1)], b = p.scarf[Math.min(n - 1, i + 1)];
+    var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    var nx = -dy / d, ny = dx / d;
+    var ripple = Math.sin(G.t * 7 - i * 0.95) * (1 + wind * 3.4) * S * (i / n);
+    var hw = (4.6 - i * 0.44) * S;
+    if (hw < 1.1 * S) hw = 1.1 * S;
+    var cx = c.x + nx * ripple + jx(31, i, 0.8 * S);
+    var cy = c.y + ny * ripple + jy(31, i, 0.8 * S);
+    L.push([cx + nx * hw, cy + ny * hw]);
+    R.push([cx - nx * hw, cy - ny * hw]);
+  }
+  var pts = L.concat(R.reverse());
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var k = 1; k < pts.length - 1; k++) {
+    ctx.quadraticCurveTo(pts[k][0], pts[k][1],
+                         (pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2);
+  }
+  ctx.closePath();
+  ctx.fillStyle = dark ? 'rgba(160,62,82,0.6)' : '#b8475c';
+  ctx.fill();
+  ctx.lineWidth = 1.6 * S;
+  ctx.strokeStyle = dark ? 'rgba(244,234,214,0.35)' : '#8e2b3e';
+  ctx.stroke();
 }
 function catchPoints() {
   var p = G.prince;
   var gy = groundY(p.x);
-  var pts = [{ x: p.x, y: gy - 46 * S, r: 30 * S, grace: false }];
+  var pts = [{ x: p.x, y: gy - 48 * S, r: 37 * S, grace: false }];
   if (Math.abs(p.vx) > 150 * S) {
     var tip = p.scarf[p.scarf.length - 1];
     pts.push({ x: tip.x, y: tip.y, r: 19 * S, grace: true });
@@ -1030,10 +1141,13 @@ function doPour() {
   /* watering the planet weeds it: the largest baobab goes */
   var worst = -1, wv = -1;
   for (var i = 0; i < G.baobabs.length; i++) if (G.baobabs[i].growth > wv) { wv = G.baobabs[i].growth; worst = i; }
-  if (worst >= 0 && p.water >= 3) {
+  if (worst >= 0) {
     burst(G.baobabs[worst].x, groundY(G.baobabs[worst].x), '#4a3a2e', 14, 130);
     G.baobabs.splice(worst, 1);
     pop('weeded', G.roseX + 60 * S, groundY(G.roseX) - 70 * S, MINT, 14);
+  }
+  for (var q = 0; q < G.baobabs.length; q++) {
+    G.baobabs[q].growth = Math.max(0.1, G.baobabs[q].growth - 0.12);
   }
   p.water = 0;
   sfx.pour();
@@ -1116,10 +1230,11 @@ function spawn() {
 
   var r = (type === T_REDROSE || type === T_GOLD) ? 17 * S
         : (type === T_ROCK ? 16 * S : (type === T_SHEEP ? 15 * S : 14 * S));
+  var ox = 26 * S + Math.random() * (W - 52 * S);
   var o = {
     id: G.oid++, type: type, kind: null, frag: null,
-    x: 26 * S + Math.random() * (W - 52 * S), y: -30 * S, r: r,
-    vy: (96 + Math.min(150, d * 23)) * S * (0.86 + Math.random() * 0.3),
+    x: ox, y: -30 * S, r: r,
+    vy: (92 + Math.min(112, d * 17)) * S * (0.88 + Math.random() * 0.26),
     vx: 0, rot: 0, spin: (Math.random() - 0.5) * 1.6, sway: Math.random() * 6.28,
     swayAmp: (type === T_ROSE || type === T_HEART) ? (10 + Math.random() * 14) : 4
   };
@@ -1127,6 +1242,26 @@ function spawn() {
   if (type === T_ROCK) { o.vy *= 1.3; o.swayAmp = 0; }
   if (type === T_GOLD || type === T_REDROSE) o.vy *= 0.75;
   if (type === T_SHEEP) { o.vy *= 0.6; o.swayAmp = 26; }
+
+  /* Reachability. A missed heart costs her a baobab, so a heart must never be
+     thrown somewhere she physically cannot reach in the time it takes to fall.
+     Work out when this one lands, compare with the last one, and pull it closer
+     if the walk between them is impossible. A perfect run stays possible. */
+  if (o.type === T_HEART) {
+    var land = G.t + (groundY(o.x) - o.y) / o.vy;
+    var reach = 290 * S;                      /* honest walking speed */
+    var slack = 46 * S;                       /* plus her reach */
+    if (G.lastHeart) {
+      var dtl = Math.max(0.12, land - G.lastHeart.land);
+      var canGo = reach * dtl + slack;
+      var gap = o.x - G.lastHeart.x;
+      if (Math.abs(gap) > canGo) {
+        o.x = clamp(G.lastHeart.x + Math.sign(gap) * canGo, 26 * S, W - 26 * S);
+        land = G.t + (groundY(o.x) - o.y) / o.vy;
+      }
+    }
+    G.lastHeart = { x: o.x, land: land };
+  }
   G.objs.push(o);
 }
 function pickFragment() {
@@ -1239,6 +1374,7 @@ function endNight() {
   G.nightT = 0;
   G.bannerT = 2.4;
   G.objs.length = 0;
+  G.lastHeart = null;
   musicNight = G.nightIdx;
   sfx.night();
   pop('+' + bonus, W / 2, H * 0.3, CREAM, 20);
@@ -1317,15 +1453,14 @@ function update(dt) {
     if (G.spawnT <= 0) {
       spawn();
       var d = difficulty();
-      G.spawnT = Math.max(0.3, 0.95 - d * 0.075) * (0.75 + Math.random() * 0.5);
-      if (d > 2.2 && Math.random() < 0.18) spawn();
+      G.spawnT = Math.max(0.47, 1.05 - d * 0.058) * (0.82 + Math.random() * 0.4);
     }
   }
 
   /* baobabs grow */
   for (var b = 0; b < G.baobabs.length; b++) {
     var bb = G.baobabs[b];
-    if (bb.growth < 1) bb.growth = Math.min(1, bb.growth + dt * 0.016);
+    if (bb.growth < 1) bb.growth = Math.min(1, bb.growth + dt * 0.008);
     if (bb.pulse > 0) bb.pulse -= dt * 2;
   }
 
@@ -1353,10 +1488,14 @@ function update(dt) {
     if (caught) continue;
 
     if (o.y - o.r > groundY(o.x) + 4 * S) {
-      if (GOOD[o.type] && o.type !== T_TRINKET && o.type !== T_SHEEP) {
+      if (o.type === T_HEART) {
+        /* a heart is the only thing that costs her anything */
         G.combo = 0;
         sprout(o.x);
         burst(o.x, groundY(o.x), '#4a3a2e', 6, 70);
+      } else if (o.type === T_STAR || o.type === T_NOTE || o.type === T_REDROSE) {
+        G.combo = Math.max(0, G.combo - 1);
+        burst(o.x, groundY(o.x), BONE, 5, 60);
       } else if (o.type === T_TRINKET) {
         pop('it fell away', o.x, groundY(o.x) - 40 * S, BONE, 13);
         burst(o.x, groundY(o.x), BONE, 8, 60);
@@ -1424,6 +1563,22 @@ function drawSky() {
   inkBlob(W * 0.78, H * 0.22 + Math.cos(t * 0.24) * 3 * S, 12 * S, 401, 'rgba(224,184,120,0.3)', 1, 1, 1.3);
   inkPath(circlePts(W * 0.78, H * 0.22, 20 * S, 14, 0.3), 402, 1.5 * S, true);
   stroke(1.3, 'rgba(244,234,214,0.25)');
+  /* a star falls now and then, on its own schedule */
+  for (var sh = 0; sh < 2; sh++) {
+    var cyc = 13 + sh * 7, ph = ((t + sh * 6.5) % cyc) / cyc;
+    if (ph < 0.09) {
+      var k2 = ph / 0.09;
+      var sx = W * (0.1 + sh * 0.45) + k2 * W * 0.42;
+      var sy = H * (0.08 + sh * 0.12) + k2 * H * 0.2;
+      var al = Math.sin(k2 * Math.PI) * 0.75;
+      var gd = ctx.createLinearGradient(sx - 70 * S, sy - 33 * S, sx, sy);
+      gd.addColorStop(0, 'rgba(244,234,214,0)'); gd.addColorStop(1, 'rgba(255,248,224,' + al + ')');
+      ctx.strokeStyle = gd; ctx.lineWidth = 2.2 * S; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx - 70 * S, sy - 33 * S); ctx.lineTo(sx, sy); ctx.stroke();
+      glow(sx, sy, 11 * S, GOLD, al * 0.8);
+    }
+  }
+
   /* washes of cloud — soft, never solid */
   for (var i = 0; i < 4; i++) {
     var cx = ((t * (3 + i * 2.2) * S + i * W * 0.33) % (W + 420 * S)) - 210 * S;
@@ -1481,12 +1636,17 @@ function drawPlanetBody() {
   for (var x2 = -20; x2 <= W + 20; x2 += Math.max(14, W / 48)) lp.push([x2, groundY(x2)]);
   inkPath(lp, 501, 2.4 * S);
   stroke(2.6, (G.screen === 'play' && G.dark > 0.5) ? 'rgba(244,234,214,0.55)' : INK);
+  ctx.save(); ctx.translate(0, -2.6 * S);
+  inkPath(lp, 502, 2 * S);
+  stroke(1.5, 'rgba(244,234,214,0.3)');
+  ctx.restore();
   /* little tufts of grass */
-  for (var k = 0; k < 18; k++) {
-    var gx = (k / 18) * W + hash(k, 1) * 20 * S;
-    var gy = groundY(gx);
-    inkPath([[gx, gy], [gx + (hash(k, 2) - 0.5) * 8 * S, gy - (4 + hash(k, 3) * 7) * S]], 510 + k, 1 * S);
-    stroke(1.5, 'rgba(158,200,176,0.5)');
+  for (var k = 0; k < 22; k++) {
+    var gx = (k / 22) * W + hash(k, 1) * 26 * S;
+    var gy = groundY(gx) + 1.5 * S;
+    var gh = (3 + hash(k, 3) * 5) * S;
+    inkPath([[gx, gy], [gx + (hash(k, 2) - 0.5) * 5 * S, gy - gh]], 510 + k, 0.8 * S);
+    stroke(1.6, 'rgba(120,170,130,0.55)');
   }
 }
 function drawKeptTrinkets() {
@@ -1708,9 +1868,17 @@ function screenMenu() {
   var cy = H * 0.26;
   text('Catch My Love', W / 2 + 2 * S, cy + 2 * S, 46, 'rgba(0,0,0,0.35)');
   text('Catch My Love', W / 2, cy, 46, CREAM);
-  var tag = isAnniversary() ? 'happy anniversary, ' + HER : cfg('tagline', 'for ' + HER);
+  var ai = annivInfo();
+  var tag = cfg('tagline', 'for ' + HER);
+  if (ai && ai.kind === 'year') tag = 'happy anniversary, ' + HER;
+  else if (ai) tag = cfg('monthLine', 'another month of you');
   text(tag, W / 2, cy + 28 * S, 15, SAND, 'center', true, 0.95);
-  if (isAnniversary()) text('something golden falls tonight', W / 2, cy + 48 * S, 12, GOLD, 'center', true, 0.8);
+  if (ai) {
+    var sub = (ai.kind === 'year')
+      ? (ai.years === 1 ? 'one year' : ai.years + ' years')
+      : ai.months + ' months';
+    text(sub + ' — something golden falls tonight', W / 2, cy + 48 * S, 12, GOLD, 'center', true, 0.85);
+  }
 
   var bw = Math.min(200 * S, W * 0.3), bh = 42 * S, by = H * 0.52;
   button('play', W / 2 - bw * 0.56, by, bw, bh, function () { startRun('journey'); });
@@ -1863,6 +2031,7 @@ function frame() {
   }
   ctx.restore();
 
+  if (vignette) ctx.drawImage(vignette, 0, 0, W, H);
   drawPaper();
 
   if (G.flash > 0) {

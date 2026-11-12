@@ -9,12 +9,19 @@ var CONTENT = {
   /* Her name, used throughout the game. */
   name: 'Flor',
 
-  /* The anniversary. Month 1-12, day 1-31. On this exact date a golden rose
-     falls once per run, worth a small fortune, and the title screen changes. */
-  anniversary: { month: 11, day: 12 },
+  /* The anniversary: the day you started. Month 1-12, day 1-31.
+     On that date a golden rose falls once per run, worth a small fortune,
+     and the title screen changes.
+     With monthly: true it also does it on the 12th of every other month,
+     quietly, for the monthversaries. Set it to false to keep it to the one day. */
+  anniversary: { month: 12, day: 12, year: 2025, monthly: true },
 
   /* Shown on the title screen under the name of the game. */
   tagline: 'for Flor',
+
+  /* Shown on the title screen on the day itself. */
+  annivLine: 'one year',
+  monthLine: 'another month of you',
 
   /* ---------------------------------------------------------------------------
      FRAGMENTS — the notes hidden inside falling stars.
