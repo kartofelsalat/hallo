@@ -368,6 +368,10 @@ function drawPrince(p, dark) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(lean * 0.35);
+  if (p.squash > 0) {
+    var sq = Math.sin(p.squash * Math.PI) * 0.16;
+    ctx.scale(1 - sq * 0.7, 1 + sq);
+  }
   ctx.translate(-x, -y);
 
   /* the cape, behind everything, swinging against the walk */
@@ -449,7 +453,9 @@ function drawPrince(p, dark) {
 
   /* the watering can */
   var canX = x + u * 0.96, canY = shoulderY - u * 0.12;
-  var cw = u * 0.72, ch = u * 0.58;
+  var pops2 = p.canPop > 0 ? 1 + Math.sin(p.canPop * Math.PI) * 0.22 : 1;
+  var cw = u * 0.72 * pops2, ch = u * 0.58 * pops2;
+  if (p.canPop > 0.05) glow(canX, canY, u * 1.4, '#6fb8c8', p.canPop * 0.4);
   var canPts = [[canX - cw / 2, canY - ch / 2], [canX + cw / 2, canY - ch * 0.56],
                 [canX + cw * 0.44, canY + ch / 2], [canX - cw * 0.44, canY + ch / 2]];
   inkPath(canPts, 71, 1.2 * S, true);
@@ -474,7 +480,7 @@ function drawPrince(p, dark) {
 
 /* ============================ the rose =================================== */
 function drawRose(x, bloom, t, dark, scale) {
-  var sc = (scale || 1) * S;
+  var sc = (scale || 1) * S * (1 + (G.roseHit > 0 ? Math.sin(G.roseHit * Math.PI) * 0.13 : 0));
   var y = groundY(x);
   var h = 58 * sc;
   var sway = Math.sin(t * 0.8) * 2.4 * sc;
@@ -813,7 +819,8 @@ var G = {
   mode: 'journey',
   t: 0, score: 0, water: 0, combo: 0, best: 0,
   nightIdx: 0, nightT: 0, nightDone: false, bannerT: 0, loop: 0,
-  objs: [], parts: [], pops: [], baobabs: [], bid: 0, oid: 0,
+  objs: [], parts: [], pops: [], rings: [], flyers: [], baobabs: [], bid: 0, oid: 0,
+  punch: 0, roseHit: 0,
   spawnT: 0, dark: 0, shake: 0, flash: 0, red: 0,
   prince: null, roseX: 0, bloom: 0, pour: null, fox: null,
   foxTamed: false, foxTimer: 0, stillT: 0,
@@ -824,7 +831,8 @@ var G = {
 function newPrince() {
   var sc = [];
   for (var i = 0; i < 9; i++) sc.push({ x: W / 2, y: groundY(W / 2) - 40 * S });
-  return { x: W / 2, vx: 0, target: W / 2, walk: 0, water: 0, scarf: sc, hurt: 0, locked: 0 };
+  return { x: W / 2, vx: 0, target: W / 2, walk: 0, water: 0, scarf: sc, hurt: 0, locked: 0,
+           squash: 0, canPop: 0 };
 }
 
 function startRun(mode) {
@@ -834,7 +842,8 @@ function startRun(mode) {
   G.screen = 'play';
   G.t = 0; G.score = 0; G.water = 0; G.combo = 0; G.best = 0;
   G.nightIdx = 0; G.nightT = 0; G.loop = 0; G.nightDone = false;
-  G.objs = []; G.parts = []; G.pops = []; G.baobabs = []; G.bid = 0;
+  G.objs = []; G.parts = []; G.pops = []; G.rings = []; G.flyers = []; G.baobabs = []; G.bid = 0;
+  G.punch = 0; G.roseHit = 0;
   G.spawnT = 1.1; G.dark = 0; G.shake = 0; G.flash = 0; G.red = 0;
   G.prince = newPrince();
   G.roseX = W * 0.5;
@@ -865,14 +874,29 @@ function pop(str, x, y, col, size) {
   G.pops.push({ s: str, x: clamp(x, hw, W - hw), y: Math.max(y, minY),
                 c: col || CREAM, t: 0, life: 1.15, size: size || 15 });
 }
-function burst(x, y, col, n, spd) {
+function burst(x, y, col, n, spd, shape) {
   n = n || 10;
   for (var i = 0; i < n; i++) {
     var a = Math.random() * 6.2832, v = (spd || 110) * (0.4 + Math.random()) * S;
     G.parts.push({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40 * S,
-                   r: (1.4 + Math.random() * 2.6) * S, c: col, t: 0, life: 0.5 + Math.random() * 0.5, g: 320 });
+                   r: (1.4 + Math.random() * 2.6) * S, c: col, t: 0, life: 0.5 + Math.random() * 0.5,
+                   g: 320, shape: shape || null, rot: Math.random() * 6.28, spin: (Math.random() - 0.5) * 9 });
   }
 }
+/* an expanding ink ring — the signature of a catch */
+function ring(x, y, col, r0, r1, life, w) {
+  G.rings.push({ x: x, y: y, c: col, r0: r0 * S, r1: r1 * S, t: 0, life: life || 0.42, w: (w || 2.6) * S });
+}
+/* a drop that flies from what she caught into the watering can */
+function flyer(x, y, col, shape) {
+  G.flyers.push({ sx: x, sy: y, x: x, y: y, c: col, shape: shape || 'drop',
+                  t: 0, life: 0.42 + Math.random() * 0.1, arc: (Math.random() - 0.5) * 60 });
+}
+function canPoint() {
+  var p = G.prince, u = 21 * S;
+  return { x: p.x + u * 0.96, y: groundY(p.x) - u * 2.0 - u * 0.12 };
+}
+function punch(v) { G.punch = Math.min(1.4, G.punch + v); }
 
 /* ============================ input ====================================== */
 var ptr = { down: false, x: 0, anchor: 0, moved: 0, id: -1 };
@@ -1045,13 +1069,23 @@ function onCatch(o, grace) {
     case T_HEART: case T_STAR:
       var sp = addWater(1);
       sfx.catch1(G.combo);
-      burst(o.x, o.y, o.type === T_HEART ? '#d4607a' : GOLD, 8);
+      var hc = o.type === T_HEART ? '#e5839a' : GOLD;
+      ring(o.x, o.y, hc, 6, 34 + Math.min(14, G.combo), 0.4, 2.6);
+      burst(o.x, o.y, hc, 7, 120, o.type === T_HEART ? 'heart' : 'star');
+      burst(o.x, o.y, CREAM, 5, 70);
+      if (sp === 0) flyer(o.x, o.y, '#6fb8c8');
+      p.squash = 1; punch(0.3);
       if (sp > 0) pop('the can is full', o.x, o.y - 18 * S, BONE, 12);
       break;
     case T_NOTE:
       sfx.spark();
-      burst(o.x, o.y, CREAM, 18, 150);
+      ring(o.x, o.y, CREAM, 6, 58, 0.6, 3);
+      ring(o.x, o.y, GOLD, 6, 38, 0.45, 2);
+      burst(o.x, o.y, CREAM, 16, 150, 'star');
+      burst(o.x, o.y, GOLD, 8, 90);
+      flyer(o.x, o.y, '#6fb8c8');
       addWater(1);
+      p.squash = 1; punch(0.7); G.flash = 0.2;
       collectFragment(o.frag);
       break;
     case T_REDROSE:
@@ -1059,7 +1093,12 @@ function onCatch(o, grace) {
       addWater(4);
       G.score += Math.round(120 * mult);
       pop('hers!  +' + Math.round(120 * mult), o.x, o.y - 20 * S, RED, 20);
-      burst(o.x, o.y, RED, 26, 180);
+      ring(o.x, o.y, RED, 8, 92, 0.65, 4);
+      ring(o.x, o.y, '#e05a70', 8, 56, 0.45, 2.5);
+      burst(o.x, o.y, RED, 22, 180, 'heart');
+      burst(o.x, o.y, '#e5839a', 14, 110);
+      for (var fq = 0; fq < 4; fq++) flyer(o.x, o.y, '#6fb8c8');
+      p.squash = 1; punch(1.2); G.shake = 0.5;
       G.flash = 0.5;
       break;
     case T_GOLD:
@@ -1067,7 +1106,12 @@ function onCatch(o, grace) {
       addWater(CAN_MAX);
       G.score += 500;
       pop('happy anniversary  +500', o.x, o.y - 22 * S, GOLD, 20);
-      burst(o.x, o.y, GOLD, 40, 220);
+      ring(o.x, o.y, GOLD, 10, 130, 0.9, 5);
+      ring(o.x, o.y, CREAM, 10, 86, 0.7, 3);
+      ring(o.x, o.y, '#fff0c0', 10, 50, 0.5, 2);
+      burst(o.x, o.y, GOLD, 34, 220, 'star');
+      burst(o.x, o.y, CREAM, 18, 140);
+      p.squash = 1; punch(1.4); G.shake = 0.7;
       G.flash = 0.8;
       break;
     case T_COIN:
@@ -1076,18 +1120,26 @@ function onCatch(o, grace) {
       else pop('+30', o.x, o.y - 18 * S, GOLD, 13);
       if (G.audit) G.audit.coins++;
       sfx.catch1(2);
+      ring(o.x, o.y, GOLD, 5, 26, 0.3, 2);
       burst(o.x, o.y, GOLD, 8);
+      p.squash = 0.6; punch(0.2);
       break;
     case T_SHEEP:
       sfx.spark(); addWater(3);
       pop('a sheep', o.x, o.y - 20 * S, CREAM, 16);
+      ring(o.x, o.y, CREAM, 6, 44, 0.5, 3);
       burst(o.x, o.y, CREAM, 14);
+      for (var sq = 0; sq < 3; sq++) flyer(o.x, o.y, '#6fb8c8');
+      p.squash = 1; punch(0.6);
       break;
     case T_TRINKET:
       sfx.spark();
       keepTrinket(o.kind);
       G.score += 60;
-      burst(o.x, o.y, CREAM, 24, 170);
+      ring(o.x, o.y, CREAM, 8, 76, 0.7, 3.4);
+      ring(o.x, o.y, MINT, 8, 46, 0.5, 2);
+      burst(o.x, o.y, CREAM, 24, 170, 'star');
+      p.squash = 1; punch(0.9);
       break;
     case T_ROSE:
       G.combo = Math.max(0, G.combo - 1);
@@ -1095,6 +1147,17 @@ function onCatch(o, grace) {
       burst(o.x, o.y, BONE, 6);
       sfx.catch1(0);
       break;
+  }
+  if (G.combo > 0 && G.combo % 5 === 0 && GOOD[o.type]) {
+    var pm = multiplier();
+    ring(p.x, groundY(p.x) - 48 * S, MINT, 18, 104, 0.6, 3);
+    pop(pm > 1 ? 'x' + pm : G.combo + ' in a row', p.x, groundY(p.x) - 104 * S, MINT, 19);
+    burst(p.x, groundY(p.x) - 48 * S, MINT, 12, 130, 'star');
+    punch(0.7);
+    if (AC && save.sound) {
+      var t0 = now();
+      [660, 880, 1100].forEach(function (f, i) { tone(f, t0 + i * 0.06, 0.4, 'sine', 0.09); });
+    }
   }
   if (grace && GOOD[o.type] && o.type !== T_TRINKET) {
     G.score += 15;
@@ -1137,7 +1200,16 @@ function doPour() {
   G.score += gained;
   G.bloom = Math.min(1, G.bloom + p.water * 0.035);
   pop('+' + gained + (mult > 1 ? '   x' + mult : ''), G.roseX, groundY(G.roseX) - 110 * S, CREAM, 22);
-  burst(G.roseX, groundY(G.roseX) - 60 * S, '#6fb8c8', 20, 140);
+  var ry = groundY(G.roseX) - 66 * S;
+  burst(G.roseX, ry, '#6fb8c8', 22, 150, 'drop');
+  burst(G.roseX, groundY(G.roseX), '#6fb8c8', 14, 110);
+  ring(G.roseX, ry, '#6fb8c8', 8, 70 + gained * 0.05, 0.6, 3.4);
+  ring(G.roseX, ry, CREAM, 8, 44, 0.45, 2);
+  if (mult > 1) ring(G.roseX, ry, RED, 8, 100, 0.8, 2.4);
+  for (var pq = 0; pq < 6; pq++) {
+    burst(G.roseX + (Math.random() - 0.5) * 40 * S, ry - 20 * S, RED, 1, 60, 'heart');
+  }
+  G.roseHit = 1; punch(0.9);
   /* watering the planet weeds it: the largest baobab goes */
   var worst = -1, wv = -1;
   for (var i = 0; i < G.baobabs.length; i++) if (G.baobabs[i].growth > wv) { wv = G.baobabs[i].growth; worst = i; }
@@ -1166,8 +1238,18 @@ function updatePour(dt) {
     G.pour.t += dt;
     if (G.pour.stage === 0) {
       if (!near || !still || p.water <= 0) { G.pour = null; return; }
-      if (G.pour.t >= 0.3) { G.pour = { stage: 1, t: 0 }; p.locked = 1.1; doPour(); }
-    } else if (G.pour.t > 1.15) G.pour = null;
+      if (G.pour.t >= 0.3) {
+        G.pour = { stage: 1, t: 0, from: p.x, to: G.roseX + (p.x < G.roseX ? -38 * S : 38 * S) };
+        p.locked = 1.1;
+        doPour();
+      }
+    } else {
+      if (G.pour.to !== undefined) {
+        var k = Math.min(1, G.pour.t / 0.3);
+        p.x = G.pour.from + (G.pour.to - G.pour.from) * (k * k * (3 - 2 * k));
+      }
+      if (G.pour.t > 1.15) G.pour = null;
+    }
   } else if (near && still && p.water > 0 && p.locked <= 0) {
     G.pour = { stage: 0, t: 0 };
   }
@@ -1420,6 +1502,29 @@ function update(dt) {
     pa.t += dt;
     pa.x += pa.vx * dt; pa.y += pa.vy * dt; pa.vy += pa.g * S * dt;
     if (pa.t > pa.life) G.parts.splice(i, 1);
+  }
+  for (var ri = G.rings.length - 1; ri >= 0; ri--) {
+    var rg = G.rings[ri]; rg.t += dt;
+    if (rg.t > rg.life) G.rings.splice(ri, 1);
+  }
+  var cp = canPoint();
+  for (var fi = G.flyers.length - 1; fi >= 0; fi--) {
+    var fl = G.flyers[fi]; fl.t += dt;
+    var k = Math.min(1, fl.t / fl.life), e = k * k * (3 - 2 * k);
+    fl.x = fl.sx + (cp.x - fl.sx) * e;
+    fl.y = fl.sy + (cp.y - fl.sy) * e - Math.sin(k * Math.PI) * (40 * S + fl.arc * S);
+    if (k >= 1) {
+      G.flyers.splice(fi, 1);
+      if (G.prince) G.prince.canPop = 1;
+      if (AC && save.sound) tone(880 + Math.random() * 180, now(), 0.1, 'sine', 0.05);
+      burst(cp.x, cp.y, '#6fb8c8', 3, 50);
+    }
+  }
+  if (G.punch > 0) G.punch = Math.max(0, G.punch - dt * 4.2);
+  if (G.roseHit > 0) G.roseHit = Math.max(0, G.roseHit - dt * 2.4);
+  if (G.prince) {
+    if (G.prince.squash > 0) G.prince.squash = Math.max(0, G.prince.squash - dt * 5);
+    if (G.prince.canPop > 0) G.prince.canPop = Math.max(0, G.prince.canPop - dt * 5);
   }
   for (var j = G.pops.length - 1; j >= 0; j--) {
     var po = G.pops[j];
@@ -1702,11 +1807,51 @@ function drawDarkPass() {
 function drawParts() {
   for (var i = 0; i < G.parts.length; i++) {
     var p = G.parts[i];
-    ctx.globalAlpha = Math.max(0, 1 - p.t / p.life) * 0.95;
+    var a = Math.max(0, 1 - p.t / p.life);
+    ctx.globalAlpha = a * 0.95;
     ctx.fillStyle = p.c;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+    if (p.shape && p.r > 1.2 * S) {
+      var r = p.r * 2.4 * (0.5 + a * 0.5);
+      ctx.save();
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.spin * p.t); ctx.translate(-p.x, -p.y);
+      ctx.beginPath();
+      var pts = p.shape === 'heart' ? heartPts(p.x, p.y, r)
+              : p.shape === 'star' ? starPts(p.x, p.y, r)
+              : circlePts(p.x, p.y, r * 0.7, 8, 1.5);
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (var q = 1; q < pts.length; q++) ctx.lineTo(pts[q][0], pts[q][1]);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.2832); ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
+}
+function drawRings() {
+  for (var i = 0; i < G.rings.length; i++) {
+    var r = G.rings[i];
+    var k = r.t / r.life, e = 1 - Math.pow(1 - k, 2.4);
+    var rr = r.r0 + (r.r1 - r.r0) * e;
+    ctx.globalAlpha = (1 - k) * 0.85;
+    var seg = Math.max(14, Math.min(40, Math.round(rr / (2.6 * S))));
+    inkPath(circlePts(r.x, r.y, rr, seg), 900 + i, rr * 0.05, true);
+    stroke(r.w * (1 - k * 0.7) / S, r.c);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawFlyers() {
+  for (var i = 0; i < G.flyers.length; i++) {
+    var f = G.flyers[i];
+    var k = Math.min(1, f.t / f.life);
+    glow(f.x, f.y, 13 * S * (1 - k * 0.4), f.c, 0.5);
+    ctx.fillStyle = f.c;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y, 3.4 * S, 4.6 * S, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 }
 function drawPops() {
   for (var i = 0; i < G.pops.length; i++) {
@@ -2011,6 +2156,10 @@ function frame() {
     var m = G.shake * G.shake * 9 * S;
     ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
   }
+  if (G.punch > 0.01) {
+    var z = 1 + Math.min(0.016, G.punch * 0.012);
+    ctx.translate(W / 2, H * 0.62); ctx.scale(z, z); ctx.translate(-W / 2, -H * 0.62);
+  }
   drawSky();
   drawPlanetBody();
   drawKeptTrinkets();
@@ -2022,12 +2171,14 @@ function frame() {
     for (var k = 0; k < G.objs.length; k++) drawFalling(G.objs[k], G.t, false);
     drawPrince(G.prince, false);
     drawParts();
+    drawRings();
+    drawFlyers();
     drawDarkPass();
     drawPops();
   } else {
     drawRose(W * 0.80, save.finale ? 1 : 0.4, G.t, false, 1.18);
     if (amb) drawPrince(amb, false);
-    drawParts(); drawPops();
+    drawParts(); drawRings(); drawPops();
   }
   ctx.restore();
 
