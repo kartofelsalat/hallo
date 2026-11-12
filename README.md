@@ -29,8 +29,12 @@ no browser chrome, and works with no connection at all.
 
 Drag anywhere to walk. Catch hearts and stars to fill the watering can. **Stand still
 on the rose to pour** — that is where the points come from, multiplied by your catch
-streak. Anything you miss sprouts a baobab; three grown baobabs end the run. Pouring
+streak. A missed heart sprouts a baobab; three grown baobabs end the run, and pouring
 weeds one. Stand still near the fox to tame him.
+
+Watch for: caterpillars, which turn into butterflies worth three times as much if you
+let them; baobab seeds, which you have to catch rather than dodge; a glass dome that
+takes one thorn for you; a pocket watch that slows the sky; and a sunset.
 
 ## Hosting on Netlify
 

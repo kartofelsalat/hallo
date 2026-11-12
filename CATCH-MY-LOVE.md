@@ -40,6 +40,25 @@ spatial, and caused by a mistake she can point at.
 Catching a hazard is not death: it spills half the can, breaks the combo, scares off
 the fox and sprouts a baobab at her feet.
 
+## 3b. What falls
+
+| | |
+|---|---|
+| **Heart** | +1 water. The only thing whose miss costs a baobab. |
+| **Star** | +1 water. Sometimes carries a note. |
+| **Note** | One line of the author's writing, kept forever. |
+| **Caterpillar** | +1 water, small. Left alone for a few seconds it becomes a **butterfly** — +3 water and real points, but it flutters and is hard to catch. One must endure a few caterpillars if one wishes to know the butterflies. |
+| **Baobab seed** | Inverts the rule: a hazard you have to *catch*. Let it land and it takes root at once, worse than a missed heart. Sprouting already, so you can see what it is. |
+| **Glass dome** | A shield. Absorbs one thorn, and you can see it over her head while it lasts. |
+| **Pocket watch** | Slows the whole sky for six seconds. |
+| **Sunset** | Rare. A warm wash floods the screen, big points, and the game counts them — because he watched forty-four in one day. |
+| **Sheep** | +3 water, drifts. |
+| **Coin** | Points, but drains the can. Businessman's night. |
+| **Red rose** | Hers. A fortune. |
+| **Golden rose** | The anniversary only. |
+| **Trinket** | Parachutes down, stays on her planet forever. |
+| **Thorn, asteroid** | Angular, no glow. Spills half the can and sprouts a baobab at her feet. |
+
 ## 4. The nights
 
 Five nights, ~45 seconds each, continuous — no level menu. Then the finale.
