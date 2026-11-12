@@ -936,7 +936,7 @@ var G = {
   spawnT: 0, dark: 0, shake: 0, flash: 0, red: 0,
   prince: null, roseX: 0, bloom: 0, pour: null, fox: null,
   foxTamed: false, foxTimer: 0, stillT: 0,
-  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null, lastHeart: null,
+  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null, lastHeart: null, sel: 0, lastScreen: '',
   finaleT: 0, caughtTrinkets: [], caughtFrags: [], audit: null
 };
 
@@ -1044,11 +1044,36 @@ canvas.addEventListener('pointerup', onUp);
 canvas.addEventListener('pointercancel', onUp);
 canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+var KEYNAV = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1,
+               a: -1, d: 1, A: -1, D: 1 };
+var kb = false;                 /* a keyboard has been used at least once */
+function moveSel(step) {
+  if (!buttons.length) return;
+  var n = buttons.length, i = G.sel;
+  for (var k = 0; k < n; k++) {
+    i = (i + step + n) % n;
+    if (!buttons[i].dim) { G.sel = i; sfx.ui(); return; }
+  }
+}
 window.addEventListener('keydown', function (e) {
-  keys[e.key] = true;
-  if (e.key === ' ' || e.key === 'Enter') { if (G.screen !== 'play') uiTap(-1, -1); }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  var k = e.key;
+  if (KEYNAV[k] !== undefined || k === ' ' || k === 'Enter' || k === 'Escape') e.preventDefault();
+  if (e.repeat && (k === ' ' || k === 'Enter')) return;
+  if (!kb && (KEYNAV[k] !== undefined || k === ' ' || k === 'Enter')) { kb = true; audioInit(); }
+  keys[k] = true;
+  if (G.screen === 'play') return;
+  if (k === 'Escape') {
+    if (G.screen === 'planet' || G.screen === 'letter' || G.screen === 'over') {
+      sfx.ui(); G.screen = 'menu'; musicOn = true; G.sel = 0;
+    }
+    return;
+  }
+  if (KEYNAV[k] !== undefined) { moveSel(KEYNAV[k]); return; }
+  if (k === ' ' || k === 'Enter') uiTap(-1, -1);
 });
 window.addEventListener('keyup', function (e) { keys[e.key] = false; });
+window.addEventListener('blur', function () { keys = {}; });
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 
 /* ============================ update ===================================== */
@@ -1074,8 +1099,11 @@ function sprout(x) {
 
 function updatePrince(dt) {
   var p = G.prince;
-  if (keys.ArrowLeft) p.target = clamp(p.x - 260 * S * dt, 0, W);
-  if (keys.ArrowRight) p.target = clamp(p.x + 260 * S * dt, 0, W);
+  /* arrows (or A/D) walk at full speed while held, and stop dead on release */
+  var kdir = ((keys.ArrowLeft || keys.a || keys.A) ? -1 : 0) +
+             ((keys.ArrowRight || keys.d || keys.D) ? 1 : 0);
+  if (kdir) { p.target = clamp(p.x + kdir * 300 * S, 0, W); p.keyHeld = true; }
+  else if (p.keyHeld) { p.keyHeld = false; p.target = p.x; }
 
   if (p.locked > 0) { p.locked -= dt; p.vx *= 0.8; }
   else {
@@ -2250,7 +2278,8 @@ function drawHUD() {
   /* first-run hint */
   if (G.hint > 0) {
     var ha = Math.min(1, G.hint / 2);
-    text('drag anywhere to walk', W / 2, H * 0.52, 16, CREAM, 'center', true, ha * 0.85);
+    text(kb ? 'arrow keys, or drag anywhere, to walk' : 'drag anywhere to walk',
+         W / 2, H * 0.52, 16, CREAM, 'center', true, ha * 0.85);
     text('catch the hearts, then stop on the rose to pour', W / 2, H * 0.52 + 22 * S, 13, BONE, 'center', true, ha * 0.8);
   }
 
@@ -2268,23 +2297,35 @@ function drawHUD() {
 /* ============================ buttons ==================================== */
 var buttons = [];
 function button(label, x, y, w, h, fn, dim) {
+  var idx = buttons.length;
   buttons.push({ x: x - w / 2, y: y - h / 2, w: w, h: h, fn: fn, dim: dim });
+  var on = kb && idx === G.sel && !dim;
   var pts = [[x - w / 2, y - h / 2], [x + w / 2, y - h / 2], [x + w / 2, y + h / 2], [x - w / 2, y + h / 2]];
   ctx.globalAlpha = dim ? 0.35 : 1;
-  inkPath(pts, 700 + buttons.length, 2 * S, true);
-  wash('rgba(244,234,214,0.1)', 1);
-  inkPath(pts, 710 + buttons.length, 2 * S, true);
-  stroke(2.2, CREAM);
+  inkPath(pts, 700 + idx, 2 * S, true);
+  wash(on ? 'rgba(244,234,214,0.22)' : 'rgba(244,234,214,0.1)', 1);
+  inkPath(pts, 710 + idx, 2 * S, true);
+  stroke(on ? 3.2 : 2.2, CREAM);
   text(label, x, y + h * 0.17, h * 0.42 / S, CREAM);
+  if (on) {
+    var px = x - w / 2 - 16 * S, py = y + h * 0.02;
+    inkPath(starPts(px, py, 6 * S), 720 + idx, 0.8 * S, true);
+    wash(GOLD, 0.95); stroke(1.4, CREAM);
+  }
   ctx.globalAlpha = 1;
 }
 function uiTap(x, y) {
-  if (x < 0) { if (buttons.length && !buttons[0].dim) { sfx.ui(); buttons[0].fn(); } return; }
+  if (x < 0) {
+    var b0 = buttons[G.sel] && !buttons[G.sel].dim ? buttons[G.sel] : null;
+    if (!b0) for (var q = 0; q < buttons.length; q++) if (!buttons[q].dim) { b0 = buttons[q]; break; }
+    if (b0) { sfx.ui(); b0.fn(); }
+    return;
+  }
   if (hitSoundBtn(x, y)) return;
   for (var i = 0; i < buttons.length; i++) {
     var b = buttons[i];
     if (!b.dim && x >= b.x - 8 * S && x <= b.x + b.w + 8 * S && y >= b.y - 8 * S && y <= b.y + b.h + 8 * S) {
-      sfx.ui(); b.fn(); return;
+      sfx.ui(); G.sel = i; b.fn(); return;
     }
   }
 }
@@ -2292,9 +2333,9 @@ function uiTap(x, y) {
 /* ============================ ambient scene ============================== */
 var amb = null;
 function updateAmbient(dt) {
-  if (!amb) { amb = newPrince(); amb.x = W * 0.22; amb.target = W * 0.3; amb.wait = 1; }
+  if (!amb) { amb = newPrince(); amb.x = W * 0.16; amb.target = W * 0.2; amb.wait = 1; }
   amb.wait -= dt;
-  if (amb.wait <= 0) { amb.target = W * (0.12 + Math.random() * 0.5); amb.wait = 2 + Math.random() * 3; }
+  if (amb.wait <= 0) { amb.target = W * (0.08 + Math.random() * 0.22); amb.wait = 2 + Math.random() * 3; }
   var dx = amb.target - amb.x;
   amb.vx += (clamp(dx * 3, -70 * S, 70 * S) - amb.vx) * Math.min(1, dt * 6);
   amb.x = clamp(amb.x + amb.vx * dt, 20 * S, W - 20 * S);
@@ -2332,6 +2373,8 @@ function screenMenu() {
 
   var line = save.high > 0 ? 'best  ' + save.high : 'drag anywhere to walk';
   text(line, W / 2, H - 26 * S, 13, BONE, 'center', true, 0.7);
+  text(kb ? 'arrow keys  ·  enter' : 'a keyboard works too',
+       W / 2, H - 11 * S, 10, BONE, 'center', true, 0.4);
 }
 
 function screenOver() {
@@ -2444,6 +2487,7 @@ function screenLetter() {
 
 /* ============================ frame ====================================== */
 function frame() {
+  if (G.screen !== G.lastScreen) { G.lastScreen = G.screen; G.sel = 0; }
   buttons.length = 0;
   ctx.save();
   if (G.shake > 0) {

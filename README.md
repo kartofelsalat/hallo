@@ -27,6 +27,10 @@ no browser chrome, and works with no connection at all.
 
 ## How to play
 
+Drag anywhere to walk, or use the **arrow keys** (or A and D) — the whole game,
+menus included, is playable from a keyboard: arrows to choose, Enter to confirm,
+Escape to go back.
+
 Drag anywhere to walk. Catch hearts and stars to fill the watering can. **Stand still
 on the rose to pour** — that is where the points come from, multiplied by your catch
 streak. A missed heart sprouts a baobab; three grown baobabs end the run, and pouring
