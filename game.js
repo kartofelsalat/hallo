@@ -159,12 +159,16 @@ function jy(seed, i, amp) { return (hash(seed * 977 + i, boil + 7919) - 0.5) * a
 /* ============================ ink drawing ================================ */
 /* every outline is redrawn with a new wobble three times a second, so the
    world looks like it is being sketched while she plays */
+var bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
 function inkPath(pts, seed, amp, close) {
   amp = amp === undefined ? 1.6 * S : amp;
   ctx.beginPath();
+  bx0 = by0 = 1e9; bx1 = by1 = -1e9;
   for (var i = 0; i < pts.length; i++) {
     var p = pts[i];
     var x = p[0] + jx(seed, i, amp), y = p[1] + jy(seed, i, amp);
+    if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+    if (y < by0) by0 = y; if (y > by1) by1 = y;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   if (close) ctx.closePath();
@@ -175,9 +179,32 @@ function stroke(w, col) {
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.stroke();
 }
+var washCache = {}, washKeys = 0;
+function washPair(col) {
+  var c = washCache[col];
+  if (!c) {
+    if (washKeys > 220) { washCache = {}; washKeys = 0; }
+    c = washCache[col] = [lerpCol(col, '#ffffff', 0.2), col, lerpCol(col, '#2a1a12', 0.17)];
+    washKeys++;
+  }
+  return c;
+}
 function wash(col, alpha) {
   ctx.globalAlpha = alpha === undefined ? 0.92 : alpha;
-  ctx.fillStyle = col; ctx.fill();
+  var w = bx1 - bx0, h = by1 - by0;
+  /* only shapes large enough to show it get the graded wash — a gradient per
+     fill is the single most expensive thing in the renderer */
+  if (w > 13 * S && h > 10 * S && col.charAt(0) !== 'r') {
+    var p = washPair(col);
+    var g = ctx.createLinearGradient(bx0, by0, bx1, by1);
+    g.addColorStop(0, p[0]);
+    g.addColorStop(0.45, p[1]);
+    g.addColorStop(1, p[2]);
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = col;
+  }
+  ctx.fill();
   ctx.globalAlpha = 1;
 }
 /* a wobbly circle as a point list */
@@ -195,6 +222,14 @@ function inkBlob(cx, cy, r, seed, fill, alpha, squash, lw) {
   if (fill) {
     inkPath(pts, seed + 1, r * 0.16, true);
     ctx.save(); ctx.translate(r * 0.08, r * 0.1); wash(fill, alpha); ctx.restore();
+    if (r > 6 * S && fill.charAt(0) !== 'r') {
+      /* the pigment gathers at the edge as it dries */
+      ctx.globalAlpha = (alpha === undefined ? 0.92 : alpha) * 0.4;
+      ctx.strokeStyle = washPair(fill)[2];
+      ctx.lineWidth = Math.max(1.2 * S, r * 0.12);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
   inkPath(pts, seed, Math.max(1.1 * S, r * 0.1), true);
   stroke(lw === undefined ? 2 : lw);
