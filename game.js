@@ -619,7 +619,7 @@ function drawTrinket(kind, x, y, sc, t) {
       inkPath([[x + u * 0.8, y], [x + u * 0.8, y - u * 1.5]], 305, 1 * S); stroke(2.2);
       break;
     case 'rabbit':
-      u *= 1.6;                    /* he deserves to be seen */
+      u *= 2.4;                    /* he deserves to be seen */
       /* he hops, every few seconds, on his own clock */
       var ph = (t * 0.55 + (x % 97) * 0.11) % 1;
       var hop = ph < 0.26 ? Math.sin(ph / 0.26 * Math.PI) * u * 0.52 : 0;
@@ -2683,7 +2683,9 @@ function screenPlanet() {
     ctx.save();
     ctx.translate(px, py); ctx.rotate(a + Math.PI / 2); ctx.translate(-px, -py);
     if (has) {
-      drawTrinket(TRINKETS[i], px, py, 0.4, t);
+      /* Herbert is drawn large in the world; on the globe that would make him
+         twice his neighbours, so he is scaled back to about a third again */
+      drawTrinket(TRINKETS[i], px, py, TRINKETS[i] === 'rabbit' ? 0.22 : 0.4, t);
     } else {
       ctx.globalAlpha = 0.22;
       ctx.setLineDash([3 * S, 3 * S]);
