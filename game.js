@@ -619,7 +619,7 @@ function drawTrinket(kind, x, y, sc, t) {
       inkPath([[x + u * 0.8, y], [x + u * 0.8, y - u * 1.5]], 305, 1 * S); stroke(2.2);
       break;
     case 'rabbit':
-      u *= 1.2;                    /* he deserves to be seen */
+      u *= 1.6;                    /* he deserves to be seen */
       /* he hops, every few seconds, on his own clock */
       var ph = (t * 0.55 + (x % 97) * 0.11) % 1;
       var hop = ph < 0.26 ? Math.sin(ph / 0.26 * Math.PI) * u * 0.52 : 0;
