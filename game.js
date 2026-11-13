@@ -936,7 +936,7 @@ var G = {
   spawnT: 0, dark: 0, shake: 0, flash: 0, red: 0,
   prince: null, roseX: 0, bloom: 0, pour: null, fox: null,
   foxTamed: false, foxTimer: 0, stillT: 0,
-  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null, lastHeart: null, sel: 0, lastScreen: '',
+  pending: [], hint: 0, roseSay: '', roseSayT: 0, over: null, lastHeart: null, sel: 0, lastScreen: '', noteStart: 0,
   finaleT: 0, caughtTrinkets: [], caughtFrags: [], audit: null
 };
 
@@ -2674,36 +2674,49 @@ function screenPlanet() {
   var frags = fragmentList();
   var px0 = W * 0.495, py0 = H * 0.155, pw = W * 0.44, ph = H * 0.605;
   paperCard(px0, py0, pw, ph, -0.014, 660);
-  var tx = px0 + pw * 0.54, inner = pw - 54 * S;
+  var tx = px0 + pw * 0.55, inner = pw - 46 * S;
   text('the notes', tx, py0 + 30 * S, 17, INK);
   text(save.fragments.length + ' of ' + frags.length + ' found',
        tx, py0 + 48 * S, 11, '#7a6354', 'center', true);
   inkPath([[px0 + 30 * S, py0 + 58 * S], [px0 + pw - 18 * S, py0 + 58 * S]], 670, 1.2 * S);
   stroke(1.4, 'rgba(58,42,34,0.35)');
 
-  var y = py0 + 80 * S, lineH = 16 * S, more = 0;
-  for (var f = 0; f < frags.length; f++) {
-    var got = save.fragments.indexOf(f) >= 0;
-    if (y > py0 + ph - 26 * S) { more++; continue; }
-    if (got) {
-      var ls = wrap(frags[f], 12.5, inner);
-      for (var j = 0; j < ls.length; j++) {
-        if (y > py0 + ph - 26 * S) { more++; break; }
-        text(ls[j], tx, y, 12.5, INK, 'center', false, 0.95);
-        y += lineH;
-      }
-      y += 6 * S;
-    } else {
-      ctx.globalAlpha = 0.25;
-      ctx.setLineDash([5 * S, 5 * S]);
-      inkPath([[tx - inner * 0.42, y - 4 * S], [tx + inner * 0.42, y - 4 * S]], 680 + f, 0.8 * S);
-      stroke(1.6, INK);
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      y += lineH + 4 * S;
-    }
+  /* only what she has actually found is written out; the rest is one line at
+     the end, so the page grows into a collection instead of a checklist */
+  var found = [];
+  for (var f = 0; f < frags.length; f++) if (save.fragments.indexOf(f) >= 0) found.push(frags[f]);
+  var missing = frags.length - found.length;
+  var y = py0 + 78 * S, lineH = 14.5 * S, bottom = py0 + ph - 30 * S;
+
+  if (G.noteStart >= found.length) G.noteStart = 0;
+  var i = G.noteStart;
+  while (i < found.length) {
+    var ls = wrap(found[i], 11.5, inner);
+    var need = ls.length * lineH + 7 * S;
+    if (y + need > bottom) break;
+    for (var j = 0; j < ls.length; j++) { text(ls[j], tx, y, 11.5, INK, 'center', false, 0.95); y += lineH; }
+    y += 7 * S;
+    i++;
   }
-  if (more > 0) text('…', tx, py0 + ph - 12 * S, 14, INK, 'center', false, 0.6);
+  var nextStart = (i < found.length) ? i : 0;
+  var paged = (G.noteStart > 0 || i < found.length);
+
+  if (!found.length) {
+    text('none found yet', tx, y + 6 * S, 12, INK, 'center', true, 0.55);
+    text('they are hidden inside the stars', tx, y + 26 * S, 11, INK, 'center', true, 0.4);
+    y += 48 * S;
+  }
+  if (i >= found.length && missing > 0 && y + lineH * 1.6 < bottom) {
+    ctx.globalAlpha = 0.3;
+    ctx.setLineDash([5 * S, 5 * S]);
+    inkPath([[tx - inner * 0.34, y + 2 * S], [tx + inner * 0.34, y + 2 * S]], 690, 0.8 * S);
+    stroke(1.6, INK);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    text(missing === 1 ? 'one more, out there somewhere' : missing + ' more, out there somewhere',
+         tx, y + 24 * S, 11, INK, 'center', true, 0.5);
+  }
+  if (paged) text('· · ·', tx, py0 + ph - 14 * S, 12, INK, 'center', false, 0.45);
   ctx.restore();                 /* the card's transform ends here */
 
   var l2 = cfg('letter2', []);
@@ -2715,6 +2728,11 @@ function screenPlanet() {
   var bw = Math.min(150 * S, W * 0.2);
   var showLetter = save.finale || save.letter2 > 0;
   var by2 = H - 26 * S, bx2 = W * 0.64;
+  if (paged) {
+    button('more notes', px0 + pw - bw * 0.5, py0 + ph + 28 * S, bw, 28 * S, function () {
+      G.noteStart = nextStart;
+    });
+  }
   if (showLetter) {
     button('back', bx2 - bw * 0.58, by2, bw, 30 * S, function () { G.screen = 'menu'; });
     button('the letter', bx2 + bw * 0.58, by2, bw, 30 * S, function () { G.screen = 'letter'; });
@@ -2756,7 +2774,7 @@ function screenLetter() {
 function frame() {
   /* start every frame from a known transform, whatever happened in the last one */
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  if (G.screen !== G.lastScreen) { G.lastScreen = G.screen; G.sel = 0; }
+  if (G.screen !== G.lastScreen) { G.lastScreen = G.screen; G.sel = 0; G.noteStart = 0; }
   buttons.length = 0;
   ctx.save();
   if (G.shake > 0) {

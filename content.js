@@ -30,14 +30,21 @@ var CONTENT = {
      Add as many as you like. 5 to 10 is a good number.
      --------------------------------------------------------------------------- */
   fragments: [
-    'TODO — a memory, one line.',
-    'TODO — a joke only she will get.',
-    'TODO — a place.',
-    'TODO — something she says.',
-    'TODO — the first thing you noticed.',
-    'TODO — a promise.',
-    'TODO — a small true thing.'
+    'The first thing I noticed was your smile. It is still contagious.',
+    'Leck meine Eier.',
+    'BSZ1. Where we met. Where we hid it. Where it began.',
+    'We laugh at literally anything, and I love it.',
+    'I love it when you are just yourself.',
+    'You are right almost all the time. Annoying to admit.',
+    'Cooking for you, a comfort show, a walk. That was a dream.',
+    'I dream of you often.',
+    'I want another vacation with you.',
+    'There are five thousand flowers and exactly one of them is mine.',
+    'I would have waited longer.',
+    'You are the only one of your kind.',
+    'Eleven months, and I still look for you in a room.'
   ],
+
 
   /* ---------------------------------------------------------------------------
      LETTER ONE — the finale. Read out by the rose when she finishes the journey.
