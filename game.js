@@ -600,7 +600,7 @@ function drawBaobab(b) {
 
 /* ============================ trinkets =================================== */
 /* the things that stay on her planet once caught */
-var TRINKETS = ['lamp','bench','scope','jar','dome','sheep','volcano','vane','boat','swing','cup','cage'];
+var TRINKETS = ['lamp','bench','rabbit','scope','jar','dome','sheep','volcano','vane','boat','swing','cup','cage'];
 function trinketName(k) { var n = cfg('trinketNames', {}); return n[k] || k; }
 function drawTrinket(kind, x, y, sc, t) {
   var u = 14 * S * (sc || 1);
@@ -617,6 +617,38 @@ function drawTrinket(kind, x, y, sc, t) {
       inkPath([[x - u, y - u * 1.4], [x + u, y - u * 1.4]], 303, 1.2 * S); stroke(2.6, '#7a5a3a');
       inkPath([[x - u * 0.8, y], [x - u * 0.8, y - u * 1.5]], 304, 1 * S); stroke(2.2);
       inkPath([[x + u * 0.8, y], [x + u * 0.8, y - u * 1.5]], 305, 1 * S); stroke(2.2);
+      break;
+    case 'rabbit':
+      u *= 1.2;                    /* he deserves to be seen */
+      /* he hops, every few seconds, on his own clock */
+      var ph = (t * 0.55 + (x % 97) * 0.11) % 1;
+      var hop = ph < 0.26 ? Math.sin(ph / 0.26 * Math.PI) * u * 0.52 : 0;
+      var lean = ph < 0.26 ? Math.sin(ph / 0.26 * Math.PI) * 0.22 : 0;
+      ctx.save();
+      ctx.translate(x, y - hop); ctx.rotate(-lean); ctx.translate(-x, -(y - hop));
+      var by3 = y - hop;
+      /* back feet */
+      inkPath([[x - u * 0.7, by3 - u * 0.1], [x - u * 0.2, by3 - u * 0.02]], 338, 0.8 * S);
+      stroke(3.4, BONE);
+      /* body */
+      inkBlob(x - u * 0.12, by3 - u * 0.45, u * 0.5, 339, '#e6dcc6', 0.96, 0.92, 2.1);
+      /* tail */
+      inkBlob(x - u * 0.6, by3 - u * 0.5, u * 0.18, 340, CREAM, 0.96, 1, 1.6);
+      /* head */
+      inkBlob(x + u * 0.36, by3 - u * 0.72, u * 0.33, 341, '#efe6d2', 0.96, 1, 2);
+      /* ears, laid back a little when he jumps */
+      for (var ei = 0; ei < 2; ei++) {
+        var ea = -1.45 + ei * 0.34 + lean * 1.1;
+        inkPath([[x + u * 0.34 + ei * u * 0.1, by3 - u * 0.92],
+                 [x + u * 0.34 + Math.cos(ea) * u * 0.3 + ei * u * 0.12, by3 - u * 1.25],
+                 [x + u * 0.3 + Math.cos(ea) * u * 0.42 + ei * u * 0.14, by3 - u * 1.62]],
+                342 + ei, 0.9 * S);
+        stroke(3.2, '#efe6d2');
+      }
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.arc(x + u * 0.46, by3 - u * 0.76, 1.5 * S, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + u * 0.64, by3 - u * 0.66, 1.1 * S, 0, 6.2832); ctx.fill();
+      ctx.restore();
       break;
     case 'scope':
       inkPath([[x - u * 0.5, y], [x, y - u * 0.9], [x + u * 0.5, y]], 306, 1.2 * S); stroke(2.2);

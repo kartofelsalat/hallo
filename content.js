@@ -88,6 +88,7 @@ var CONTENT = {
   trinketNames: {
     lamp:    'The lamplighter\'s lamp',
     bench:   'A bench for two',
+    rabbit:  'Herbert',
     scope:   'A telescope',
     jar:     'A star in a jar',
     dome:    'The glass dome',

@@ -87,7 +87,7 @@ grace bonus. It rewards sweeping movement over twitching.
 
 - **Trinkets.** Rare parachuting objects, one guaranteed at the end of each night.
   Caught once, they are planted on her planet forever and appear in every future run.
-  Twelve of them. This is the long replay hook.
+  Thirteen of them, Herbert the rabbit among them. This is the long replay hook.
 - **Notes.** Stars carrying one line each of the author's writing. Collected in
   *Her Planet*, kept forever.
 - **Two letters.** Letter one plays at the finale. Letter two is revealed one line per

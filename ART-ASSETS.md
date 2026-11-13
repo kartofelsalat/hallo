@@ -46,6 +46,7 @@ them apart, because things generated in one image always match each other.
 | `art/watch.png` | a brass pocket watch |
 | `art/sun.png` | a small warm sun with rays |
 | `art/sheep.png` | a little cream sheep, side on |
+| `art/rabbit.png` | a small sitting rabbit, side on, facing right, long ears up |
 | `art/baobab.png` | a fat baobab tree with a wide crown |
 | `art/fox.png` | a small orange desert fox sitting, side on, facing right |
 
